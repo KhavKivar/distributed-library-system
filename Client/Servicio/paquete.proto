@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option go_package = "google.golang.org/Tarea2SD/Client/Servicio";
+
+package paquete;
+
+
+// Servicios usados para la implementacion de la estructura centralizada
+service estructura_centralizada{
+    rpc Hello (t) returns (t) {}
+
+}
+
+message t{
+    string mensaje = 1;
+}
