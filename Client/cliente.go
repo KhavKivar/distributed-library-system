@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"time"
 
@@ -14,7 +15,9 @@ import (
 )
 
 const (
-	address = "localhost:50051"
+	address1 = "localhost:50051"
+	address2 = "localhost:50052"
+	address3 = "localhost:50053"
 )
 
 func uploadFile(ctx context.Context, c pb.EstructuraCentralizadaClient, f string, name string, etx string) (stats pb.UploadStatus, err error) {
@@ -28,7 +31,7 @@ func uploadFile(ctx context.Context, c pb.EstructuraCentralizadaClient, f string
 
 	fileInfo, _ := file.Stat()
 	var fileSize int64 = fileInfo.Size()
-	const fileChunk = 256000 //250KB
+	const fileChunk = 250000 //250KB
 	totalPartsNum := uint64(math.Ceil(float64(fileSize) / float64(fileChunk)))
 	fmt.Printf("Splitting to %d pieces.\n", totalPartsNum)
 
@@ -42,10 +45,10 @@ func uploadFile(ctx context.Context, c pb.EstructuraCentralizadaClient, f string
 	return
 
 }
-
-func main() {
-
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+func uploadFileRandom(f string, name string, etx string) {
+	conexiones := [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+	elegido := conexiones[rand.Intn(3)]
+	conn, err := grpc.Dial(elegido, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -53,6 +56,9 @@ func main() {
 	c := pb.NewEstructuraCentralizadaClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	uploadFile(ctx, c, f, name, etx)
+}
 
-	uploadFile(ctx, c, "./Book/Frankenstein-Mary_Shelley.pdf", "Frankenstein-Mary_Shelley", "pdf")
+func main() {
+	uploadFileRandom("./Book/Frankenstein-Mary_Shelley.pdf", "Frankenstein-Mary_Shelley", "pdf")
 }

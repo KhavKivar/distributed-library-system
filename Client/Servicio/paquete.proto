@@ -8,8 +8,22 @@ package paquete;
 // Servicios usados para la implementacion de la estructura centralizada
 service estructura_centralizada{
     rpc Subir(Chunk) returns (UploadStatus){}
+    rpc EnviarPropuesta (Propuesta)returns (Respuesta){}
 }
 
+message Respuesta {
+    string Mensaje= 1;
+}
+
+
+message Propuesta{
+  string  Book = 1;
+  int32 totalChunks = 2;
+  int32 ChunkSendToServer1 = 3;
+  int32 ChunkSendToServer2 = 4;
+  int32 ChunkSendToServer3 = 5;
+    
+}
 message Chunk {
     bytes Contenido = 1;
     int32 totalChunks = 2;
