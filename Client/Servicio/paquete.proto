@@ -7,10 +7,26 @@ package paquete;
 
 // Servicios usados para la implementacion de la estructura centralizada
 service estructura_centralizada{
-    rpc Hello (t) returns (t) {}
-
+    rpc Subir(Chunk) returns (UploadStatus){}
 }
 
-message t{
-    string mensaje = 1;
+message Chunk {
+    bytes Contenido = 1;
+    int32 totalChunks = 2;
+    int32 numeroChunk = 3;
+    string nombre = 4;
+    string ext = 5;
 }
+
+
+enum UploadStatusCode {
+    Unknown = 0;
+    Ok = 1;
+    Failed = 2;
+}
+
+message UploadStatus {
+    string Mensaje = 1;
+    UploadStatusCode Code = 2;
+}
+

@@ -17,7 +17,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EstructuraCentralizadaClient interface {
-	Hello(ctx context.Context, in *T, opts ...grpc.CallOption) (*T, error)
+	Subir(ctx context.Context, in *Chunk, opts ...grpc.CallOption) (*UploadStatus, error)
 }
 
 type estructuraCentralizadaClient struct {
@@ -28,9 +28,9 @@ func NewEstructuraCentralizadaClient(cc grpc.ClientConnInterface) EstructuraCent
 	return &estructuraCentralizadaClient{cc}
 }
 
-func (c *estructuraCentralizadaClient) Hello(ctx context.Context, in *T, opts ...grpc.CallOption) (*T, error) {
-	out := new(T)
-	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/Hello", in, out, opts...)
+func (c *estructuraCentralizadaClient) Subir(ctx context.Context, in *Chunk, opts ...grpc.CallOption) (*UploadStatus, error) {
+	out := new(UploadStatus)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/Subir", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (c *estructuraCentralizadaClient) Hello(ctx context.Context, in *T, opts ..
 // All implementations must embed UnimplementedEstructuraCentralizadaServer
 // for forward compatibility
 type EstructuraCentralizadaServer interface {
-	Hello(context.Context, *T) (*T, error)
+	Subir(context.Context, *Chunk) (*UploadStatus, error)
 	mustEmbedUnimplementedEstructuraCentralizadaServer()
 }
 
@@ -49,8 +49,8 @@ type EstructuraCentralizadaServer interface {
 type UnimplementedEstructuraCentralizadaServer struct {
 }
 
-func (UnimplementedEstructuraCentralizadaServer) Hello(context.Context, *T) (*T, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Hello not implemented")
+func (UnimplementedEstructuraCentralizadaServer) Subir(context.Context, *Chunk) (*UploadStatus, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Subir not implemented")
 }
 func (UnimplementedEstructuraCentralizadaServer) mustEmbedUnimplementedEstructuraCentralizadaServer() {
 }
@@ -66,20 +66,20 @@ func RegisterEstructuraCentralizadaServer(s grpc.ServiceRegistrar, srv Estructur
 	s.RegisterService(&_EstructuraCentralizada_serviceDesc, srv)
 }
 
-func _EstructuraCentralizada_Hello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(T)
+func _EstructuraCentralizada_Subir_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Chunk)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EstructuraCentralizadaServer).Hello(ctx, in)
+		return srv.(EstructuraCentralizadaServer).Subir(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/paquete.estructura_centralizada/Hello",
+		FullMethod: "/paquete.estructura_centralizada/Subir",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EstructuraCentralizadaServer).Hello(ctx, req.(*T))
+		return srv.(EstructuraCentralizadaServer).Subir(ctx, req.(*Chunk))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -89,10 +89,10 @@ var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*EstructuraCentralizadaServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Hello",
-			Handler:    _EstructuraCentralizada_Hello_Handler,
+			MethodName: "Subir",
+			Handler:    _EstructuraCentralizada_Subir_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "Servicio/paquete.proto",
+	Metadata: "paquete.proto",
 }
