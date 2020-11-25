@@ -67,6 +67,12 @@ func chooseRandom() int {
 	return rand.Intn(3)
 }
 
+func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+
+	return &pb.Mensaje{Msg: "Hello"}, nil
+
+}
+
 func distribuirInicial(total int) (int, int, int, int) {
 	if total == 2 {
 		return 1, 1, 0, total - 2

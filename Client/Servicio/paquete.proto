@@ -9,8 +9,12 @@ package paquete;
 service estructura_centralizada{
     rpc Subir(Chunk) returns (UploadStatus){}
     rpc EnviarPropuesta (Propuesta)returns (Respuesta){}
+    rpc VerificarEstadoServidor(Mensaje) returns (Mensaje){}
 }
 
+message Mensaje {
+    string Msg = 1;
+}
 message Respuesta {
     string Mensaje= 1;
 }

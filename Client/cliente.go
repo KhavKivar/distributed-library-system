@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/rand"
 	"os"
 	"time"
 
@@ -46,9 +45,9 @@ func uploadFile(ctx context.Context, c pb.EstructuraCentralizadaClient, f string
 
 }
 func uploadFileRandom(f string, name string, etx string) {
-	conexiones := [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
-	elegido := conexiones[rand.Intn(3)]
-	conn, err := grpc.Dial(elegido, grpc.WithInsecure(), grpc.WithBlock())
+	//conexiones := [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+	//elegido := conexiones[rand.Intn(3)]
+	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}

@@ -147,6 +147,12 @@ func manejarPropuesta(total int, origen int, nombre string) {
 	enviarPropuesta(s1, s2, s3, nombre, total)
 }
 
+func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+
+	return &pb.Mensaje{Msg: "Hello"}, nil
+
+}
+
 func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, error) {
 	var (
 		chunk   []byte
@@ -175,7 +181,7 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 		queue = append(queue, nombre)
 		if verificarSubida(nombre) {
 			exito = true
-			manejarPropuesta(int(total), 1, nombre)
+			go manejarPropuesta(int(total), 1, nombre)
 		}
 	}
 

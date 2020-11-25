@@ -63,6 +63,11 @@ func verificarSubida(nameBook string) bool {
 	return true
 }
 
+func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+
+	return &pb.Mensaje{Msg: "Hello"}, nil
+
+}
 func chooseRandom() int {
 	return rand.Intn(3)
 }

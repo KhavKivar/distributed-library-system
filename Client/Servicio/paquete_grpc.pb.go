@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 type EstructuraCentralizadaClient interface {
 	Subir(ctx context.Context, in *Chunk, opts ...grpc.CallOption) (*UploadStatus, error)
 	EnviarPropuesta(ctx context.Context, in *Propuesta, opts ...grpc.CallOption) (*Respuesta, error)
+	VerificarEstadoServidor(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
 }
 
 type estructuraCentralizadaClient struct {
@@ -47,12 +48,22 @@ func (c *estructuraCentralizadaClient) EnviarPropuesta(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *estructuraCentralizadaClient) VerificarEstadoServidor(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error) {
+	out := new(Mensaje)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/VerificarEstadoServidor", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EstructuraCentralizadaServer is the server API for EstructuraCentralizada service.
 // All implementations must embed UnimplementedEstructuraCentralizadaServer
 // for forward compatibility
 type EstructuraCentralizadaServer interface {
 	Subir(context.Context, *Chunk) (*UploadStatus, error)
 	EnviarPropuesta(context.Context, *Propuesta) (*Respuesta, error)
+	VerificarEstadoServidor(context.Context, *Mensaje) (*Mensaje, error)
 	mustEmbedUnimplementedEstructuraCentralizadaServer()
 }
 
@@ -65,6 +76,9 @@ func (UnimplementedEstructuraCentralizadaServer) Subir(context.Context, *Chunk) 
 }
 func (UnimplementedEstructuraCentralizadaServer) EnviarPropuesta(context.Context, *Propuesta) (*Respuesta, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EnviarPropuesta not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) VerificarEstadoServidor(context.Context, *Mensaje) (*Mensaje, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerificarEstadoServidor not implemented")
 }
 func (UnimplementedEstructuraCentralizadaServer) mustEmbedUnimplementedEstructuraCentralizadaServer() {
 }
@@ -116,6 +130,24 @@ func _EstructuraCentralizada_EnviarPropuesta_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EstructuraCentralizada_VerificarEstadoServidor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Mensaje)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).VerificarEstadoServidor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/VerificarEstadoServidor",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).VerificarEstadoServidor(ctx, req.(*Mensaje))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "paquete.estructura_centralizada",
 	HandlerType: (*EstructuraCentralizadaServer)(nil),
@@ -127,6 +159,10 @@ var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EnviarPropuesta",
 			Handler:    _EstructuraCentralizada_EnviarPropuesta_Handler,
+		},
+		{
+			MethodName: "VerificarEstadoServidor",
+			Handler:    _EstructuraCentralizada_VerificarEstadoServidor_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
