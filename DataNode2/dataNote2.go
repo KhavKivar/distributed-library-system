@@ -20,6 +20,8 @@ const (
 	address = "localhost:50055"
 )
 
+var ipServer = make(map[int]string)
+
 // server is used to implement helloworld.GreeterServer.
 type server struct {
 	pb.UnimplementedEstructuraCentralizadaServer
@@ -133,6 +135,72 @@ func generarPropuesta(total int, origen int) (int, int, int) {
 	}
 	return distribuirRandom(total)
 }
+func eliminarChunk(path string) {
+	e := os.Remove(path)
+	if e != nil {
+		log.Fatal(e)
+	}
+}
+
+func enviarChunk(path string, numeroMaquina int, total int, numeroChunk int32, nombre string) {
+
+	conn, err := grpc.Dial(ipServer[numeroMaquina], grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
+	fi, _ := os.Stat(path)
+	file, _ := os.Open(path)
+
+	size := fi.Size()
+	partBuffer := make([]byte, size)
+	file.Read(partBuffer)
+
+	c.EnviarChunk(ctx, &pb.ChunkSendToServer{Contenido: partBuffer, NumeroChunk: int32(numeroChunk), Nombre: nombre, TotalChunks: int32(total)})
+
+}
+
+func distribuirChunks(s1 int32, s2 int32, s3 int32, nombre string, total int) {
+	var i int32
+	totalf := s1 + s2 + s3
+	path := nombre + "/"
+
+	corte := s1
+	corte2 := s1 + s2
+	for i = 0; i < totalf; i++ {
+		if i > corte2 {
+			enviarChunk(path+fmt.Sprint(i), 3, total, i, nombre)
+			eliminarChunk(path + fmt.Sprint(i))
+		} else if i < corte {
+			enviarChunk(path+fmt.Sprint(i), 1, total, i, nombre)
+			eliminarChunk(path + fmt.Sprint(i))
+		}
+
+	}
+}
+func (s *server) EnviarChunk(ctx context.Context, in *pb.ChunkSendToServer) (*pb.Mensaje, error) {
+
+	var (
+		name  string
+		chunk []byte
+		part  int32
+	)
+	name = in.GetNombre()
+	chunk = in.GetContenido()
+	part = in.GetNumeroChunk()
+	path := name + "/" + strconv.Itoa(int(part))
+
+	crearCarpeta(name)
+	crearArchivo(path)
+	escribirChunk(path, chunk)
+
+	return &pb.Mensaje{Msg: "ok"}, nil
+
+}
 
 func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
@@ -146,6 +214,15 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	re, _ := c.EnviarPropuesta(ctx,
 		&pb.Propuesta{Book: nombre, ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3), TotalChunks: int32(total)})
 	log.Printf("%v", re.GetMensaje())
+	var (
+		server1 int32
+		server2 int32
+		server3 int32
+	)
+
+	server1, server2, server3 = re.GetChunkSendToServer1(), re.GetChunkSendToServer2(), re.GetChunkSendToServer3()
+	distribuirChunks(server1, server2, server3, nombre, total)
+
 }
 
 func manejarPropuesta(total int, origen int, nombre string) {
@@ -193,6 +270,10 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 }
 
 func main() {
+	ipServer[1] = "localhost:50051"
+	ipServer[2] = "localhost:50052"
+	ipServer[3] = "localhost:50053"
+
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

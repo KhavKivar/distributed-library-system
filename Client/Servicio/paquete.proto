@@ -10,13 +10,28 @@ service estructura_centralizada{
     rpc Subir(Chunk) returns (UploadStatus){}
     rpc EnviarPropuesta (Propuesta)returns (Respuesta){}
     rpc VerificarEstadoServidor(Mensaje) returns (Mensaje){}
+    rpc EnviarChunk(ChunkSendToServer)returns(Mensaje){ }
+
+
 }
+
+message ChunkSendToServer {
+    bytes Contenido = 1;
+    int32 totalChunks = 2;
+    int32 numeroChunk = 3;
+    string nombre = 4;
+}
+
+
 
 message Mensaje {
     string Msg = 1;
 }
 message Respuesta {
     string Mensaje= 1;
+    int32 ChunkSendToServer1 = 3;
+    int32 ChunkSendToServer2 = 4;
+    int32 ChunkSendToServer3 = 5;
 }
 
 

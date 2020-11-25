@@ -5,6 +5,8 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
+	"strconv"
 	"time"
 
 	pb "google.golang.org/Tarea2SD/Client/Servicio"
@@ -23,7 +25,6 @@ type server struct {
 var ipServer = make(map[int]string)
 
 func serverIsOn(number int) bool {
-	log.Printf("Conectar al server %v", number)
 	conn, err := grpc.Dial(ipServer[number], grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
@@ -126,25 +127,62 @@ func generarNuevaPropuesta(total int) (int, int, int) {
 
 }
 
+func writeLogs(name string, s1 int, s2 int, s3 int) {
+	f, err := os.OpenFile("BookInfo.log",
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(name + "    " + strconv.Itoa(s1+s2+s3) + "\n"); err != nil {
+		log.Println(err)
+	}
+
+	total := s1 + s2 + s3
+
+	for i := 0; i < total; i++ {
+		if s1 > 0 {
+			f.WriteString("parte_" + strconv.Itoa(i) + "    " + ipServer[1] + "\n")
+			s1--
+			continue
+		}
+		if s2 > 0 {
+			f.WriteString("parte_" + strconv.Itoa(i) + "    " + ipServer[2] + "\n")
+			s2--
+			continue
+		}
+		if s3 > 0 {
+			f.WriteString("parte_" + strconv.Itoa(i) + "    " + ipServer[3] + "\n")
+			s3--
+			continue
+		}
+	}
+
+}
+
 func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
 	var (
-		s1    int
-		s2    int
-		s3    int
-		total int
+		s1     int
+		s2     int
+		s3     int
+		total  int
+		nombre string
 	)
 	s1 = int(in.GetChunkSendToServer1())
 	s2 = int(in.GetChunkSendToServer2())
 	s3 = int(in.GetChunkSendToServer3())
+	nombre = in.GetBook()
 	total = int(in.GetTotalChunks())
 	if analizarPropuesta(s1, s2, s3) {
 		log.Printf("Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
-		return &pb.Respuesta{Mensaje: "Ok"}, nil
+		writeLogs(nombre, s1, s2, s3)
+		return &pb.Respuesta{Mensaje: "Ok", ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3)}, nil
 	}
 	s1, s2, s3 = generarNuevaPropuesta(total)
+	writeLogs(nombre, s1, s2, s3)
 	log.Printf("Nueva Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
+	return &pb.Respuesta{Mensaje: "Ok", ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3)}, nil
 
-	return &pb.Respuesta{Mensaje: "Ok"}, nil
 }
 
 func main() {
