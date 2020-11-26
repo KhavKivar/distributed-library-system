@@ -11,9 +11,30 @@ service estructura_centralizada{
     rpc EnviarPropuesta (Propuesta)returns (Respuesta){}
     rpc VerificarEstadoServidor(Mensaje) returns (Mensaje){}
     rpc EnviarChunk(ChunkSendToServer)returns(Mensaje){ }
-
+    rpc BajarArchivo(BookToDownload)returns (ListChunk){}
+    rpc BajarChunk(ChunkDes)returns(ChunkBook){}
 
 }
+
+message ChunkDes{
+    string Book = 1;
+    string Part = 2;
+}
+message ChunkBook{
+    bytes Contenido = 1;
+}
+
+
+message ListChunk{
+    repeated string ChunkList = 1;
+}
+
+
+message BookToDownload{
+    string Book = 1;
+}
+
+
 
 message ChunkSendToServer {
     bytes Contenido = 1;

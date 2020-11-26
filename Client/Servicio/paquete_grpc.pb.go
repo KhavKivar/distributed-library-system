@@ -21,6 +21,8 @@ type EstructuraCentralizadaClient interface {
 	EnviarPropuesta(ctx context.Context, in *Propuesta, opts ...grpc.CallOption) (*Respuesta, error)
 	VerificarEstadoServidor(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
 	EnviarChunk(ctx context.Context, in *ChunkSendToServer, opts ...grpc.CallOption) (*Mensaje, error)
+	BajarArchivo(ctx context.Context, in *BookToDownload, opts ...grpc.CallOption) (*ListChunk, error)
+	BajarChunk(ctx context.Context, in *ChunkDes, opts ...grpc.CallOption) (*ChunkBook, error)
 }
 
 type estructuraCentralizadaClient struct {
@@ -67,6 +69,24 @@ func (c *estructuraCentralizadaClient) EnviarChunk(ctx context.Context, in *Chun
 	return out, nil
 }
 
+func (c *estructuraCentralizadaClient) BajarArchivo(ctx context.Context, in *BookToDownload, opts ...grpc.CallOption) (*ListChunk, error) {
+	out := new(ListChunk)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/BajarArchivo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *estructuraCentralizadaClient) BajarChunk(ctx context.Context, in *ChunkDes, opts ...grpc.CallOption) (*ChunkBook, error) {
+	out := new(ChunkBook)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/BajarChunk", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EstructuraCentralizadaServer is the server API for EstructuraCentralizada service.
 // All implementations must embed UnimplementedEstructuraCentralizadaServer
 // for forward compatibility
@@ -75,6 +95,8 @@ type EstructuraCentralizadaServer interface {
 	EnviarPropuesta(context.Context, *Propuesta) (*Respuesta, error)
 	VerificarEstadoServidor(context.Context, *Mensaje) (*Mensaje, error)
 	EnviarChunk(context.Context, *ChunkSendToServer) (*Mensaje, error)
+	BajarArchivo(context.Context, *BookToDownload) (*ListChunk, error)
+	BajarChunk(context.Context, *ChunkDes) (*ChunkBook, error)
 	mustEmbedUnimplementedEstructuraCentralizadaServer()
 }
 
@@ -93,6 +115,12 @@ func (UnimplementedEstructuraCentralizadaServer) VerificarEstadoServidor(context
 }
 func (UnimplementedEstructuraCentralizadaServer) EnviarChunk(context.Context, *ChunkSendToServer) (*Mensaje, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EnviarChunk not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) BajarArchivo(context.Context, *BookToDownload) (*ListChunk, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BajarArchivo not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) BajarChunk(context.Context, *ChunkDes) (*ChunkBook, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BajarChunk not implemented")
 }
 func (UnimplementedEstructuraCentralizadaServer) mustEmbedUnimplementedEstructuraCentralizadaServer() {
 }
@@ -180,6 +208,42 @@ func _EstructuraCentralizada_EnviarChunk_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EstructuraCentralizada_BajarArchivo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookToDownload)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).BajarArchivo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/BajarArchivo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).BajarArchivo(ctx, req.(*BookToDownload))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EstructuraCentralizada_BajarChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChunkDes)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).BajarChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/BajarChunk",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).BajarChunk(ctx, req.(*ChunkDes))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "paquete.estructura_centralizada",
 	HandlerType: (*EstructuraCentralizadaServer)(nil),
@@ -200,7 +264,15 @@ var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 			MethodName: "EnviarChunk",
 			Handler:    _EstructuraCentralizada_EnviarChunk_Handler,
 		},
+		{
+			MethodName: "BajarArchivo",
+			Handler:    _EstructuraCentralizada_BajarArchivo_Handler,
+		},
+		{
+			MethodName: "BajarChunk",
+			Handler:    _EstructuraCentralizada_BajarChunk_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "paquete.proto",
+	Metadata: "Servicio/paquete.proto",
 }
