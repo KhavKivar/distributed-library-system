@@ -24,6 +24,9 @@ type EstructuraCentralizadaClient interface {
 	BajarArchivo(ctx context.Context, in *BookToDownload, opts ...grpc.CallOption) (*ListChunk, error)
 	BajarChunk(ctx context.Context, in *ChunkDes, opts ...grpc.CallOption) (*ChunkBook, error)
 	ObtenerLibrosDisponibles(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Books, error)
+	PedirRecurso(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
+	LiberarRecurso(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
+	WriteLogs(ctx context.Context, in *Propuesta, opts ...grpc.CallOption) (*Mensaje, error)
 }
 
 type estructuraCentralizadaClient struct {
@@ -97,6 +100,33 @@ func (c *estructuraCentralizadaClient) ObtenerLibrosDisponibles(ctx context.Cont
 	return out, nil
 }
 
+func (c *estructuraCentralizadaClient) PedirRecurso(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error) {
+	out := new(Mensaje)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/PedirRecurso", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *estructuraCentralizadaClient) LiberarRecurso(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error) {
+	out := new(Mensaje)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/LiberarRecurso", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *estructuraCentralizadaClient) WriteLogs(ctx context.Context, in *Propuesta, opts ...grpc.CallOption) (*Mensaje, error) {
+	out := new(Mensaje)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/WriteLogs", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EstructuraCentralizadaServer is the server API for EstructuraCentralizada service.
 // All implementations must embed UnimplementedEstructuraCentralizadaServer
 // for forward compatibility
@@ -108,6 +138,9 @@ type EstructuraCentralizadaServer interface {
 	BajarArchivo(context.Context, *BookToDownload) (*ListChunk, error)
 	BajarChunk(context.Context, *ChunkDes) (*ChunkBook, error)
 	ObtenerLibrosDisponibles(context.Context, *Mensaje) (*Books, error)
+	PedirRecurso(context.Context, *Mensaje) (*Mensaje, error)
+	LiberarRecurso(context.Context, *Mensaje) (*Mensaje, error)
+	WriteLogs(context.Context, *Propuesta) (*Mensaje, error)
 	mustEmbedUnimplementedEstructuraCentralizadaServer()
 }
 
@@ -135,6 +168,15 @@ func (UnimplementedEstructuraCentralizadaServer) BajarChunk(context.Context, *Ch
 }
 func (UnimplementedEstructuraCentralizadaServer) ObtenerLibrosDisponibles(context.Context, *Mensaje) (*Books, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ObtenerLibrosDisponibles not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) PedirRecurso(context.Context, *Mensaje) (*Mensaje, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PedirRecurso not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) LiberarRecurso(context.Context, *Mensaje) (*Mensaje, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LiberarRecurso not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) WriteLogs(context.Context, *Propuesta) (*Mensaje, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WriteLogs not implemented")
 }
 func (UnimplementedEstructuraCentralizadaServer) mustEmbedUnimplementedEstructuraCentralizadaServer() {
 }
@@ -276,6 +318,60 @@ func _EstructuraCentralizada_ObtenerLibrosDisponibles_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EstructuraCentralizada_PedirRecurso_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Mensaje)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).PedirRecurso(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/PedirRecurso",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).PedirRecurso(ctx, req.(*Mensaje))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EstructuraCentralizada_LiberarRecurso_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Mensaje)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).LiberarRecurso(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/LiberarRecurso",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).LiberarRecurso(ctx, req.(*Mensaje))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EstructuraCentralizada_WriteLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Propuesta)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).WriteLogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/WriteLogs",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).WriteLogs(ctx, req.(*Propuesta))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "paquete.estructura_centralizada",
 	HandlerType: (*EstructuraCentralizadaServer)(nil),
@@ -307,6 +403,18 @@ var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ObtenerLibrosDisponibles",
 			Handler:    _EstructuraCentralizada_ObtenerLibrosDisponibles_Handler,
+		},
+		{
+			MethodName: "PedirRecurso",
+			Handler:    _EstructuraCentralizada_PedirRecurso_Handler,
+		},
+		{
+			MethodName: "LiberarRecurso",
+			Handler:    _EstructuraCentralizada_LiberarRecurso_Handler,
+		},
+		{
+			MethodName: "WriteLogs",
+			Handler:    _EstructuraCentralizada_WriteLogs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

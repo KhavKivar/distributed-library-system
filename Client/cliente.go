@@ -158,7 +158,7 @@ func rutinaUploadFiles(folder string, dontInclude string) {
 			bookName := strings.Split(bookWithExt, ".")[0]
 
 			path := folder + "/" + bookWithExt
-			uploadFileRandom(path, bookName, ext)
+			go uploadFileRandom(path, bookName, ext)
 		}
 	}
 
@@ -173,10 +173,11 @@ func main() {
 		fmt.Print("1) Enviar libros automaticamente\n")
 		fmt.Print("2) Descargar un libro \n")
 		text, _ := reader.ReadString('\n')
+
 		if text == "1\n" {
 			rutinaUploadFiles("./Book", "Book")
-			rutinaUploadFiles("./Book2", "Book2")
 		}
+
 		if text == "2\n" {
 			log.Println("Elija un libro a descargar en la siguiente lista: ")
 			libros := verLibrosDisponibles()
