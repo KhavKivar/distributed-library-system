@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"math/rand"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	pb "google.golang.org/Tarea2SD/Client/Servicio"
@@ -23,6 +25,7 @@ type server struct {
 }
 
 var ipServer = make(map[int]string)
+var extBookInfo = make(map[string]string)
 
 func serverIsOn(number int) bool {
 	conn, err := grpc.Dial(ipServer[number], grpc.WithInsecure())
@@ -73,6 +76,7 @@ func analizarPropuesta(s1 int, s2 int, s3 int) bool {
 
 func chooseRandomServer(server [3]bool) int {
 	for {
+		rand.Seed(time.Now().UnixNano())
 		random := rand.Intn(3)
 		if server[random] {
 			return random
@@ -159,6 +163,59 @@ func writeLogs(name string, s1 int, s2 int, s3 int) {
 	}
 
 }
+func (s *server) BajarArchivo(ctx context.Context, in *pb.BookToDownload) (*pb.ListChunk, error) {
+	//Leer log
+	file, err := os.Open("BookInfo.log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	bookName := in.GetBook()
+
+	scanner := bufio.NewScanner(file)
+	var contador = 0
+	var listDirecciones []string
+
+	log.Println("se recibio un pedido a descargar el libro ", bookName)
+
+	breakN := true
+	c := false
+	for scanner.Scan() && breakN {
+		text := scanner.Text()
+		listText := strings.Fields(text)
+		if c {
+			vp := strings.Split(listText[0], "_")[0]
+			if vp != "parte" {
+				break
+
+			}
+
+			listDirecciones = append(listDirecciones, text)
+
+		}
+
+		if listText[0] == bookName {
+			log.Println(listText)
+
+			contador++
+			c = true
+		}
+
+	}
+
+	return &pb.ListChunk{ChunkList: listDirecciones, Ext: extBookInfo[bookName]}, nil
+
+}
+func (s *server) ObtenerLibrosDisponibles(ctx context.Context, in *pb.Mensaje) (*pb.Books, error) {
+	var Books []string
+
+	for key := range extBookInfo {
+		Books = append(Books, key)
+	}
+
+	return &pb.Books{Book: Books}, nil
+}
 
 func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
 	var (
@@ -173,6 +230,8 @@ func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Res
 	s3 = int(in.GetChunkSendToServer3())
 	nombre = in.GetBook()
 	total = int(in.GetTotalChunks())
+	extBookInfo[nombre] = in.GetExt()
+
 	if analizarPropuesta(s1, s2, s3) {
 		log.Printf("Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
 		writeLogs(nombre, s1, s2, s3)
@@ -185,11 +244,16 @@ func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Res
 
 }
 
+func cleanLogs() {
+	os.Remove("BookInfo.log")
+
+}
+
 func main() {
 	ipServer[1] = "localhost:50051"
 	ipServer[2] = "localhost:50052"
 	ipServer[3] = "localhost:50053"
-
+	cleanLogs()
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

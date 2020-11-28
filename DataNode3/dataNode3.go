@@ -8,7 +8,9 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	pb "google.golang.org/Tarea2SD/Client/Servicio"
@@ -65,12 +67,8 @@ func verificarSubida(nameBook string) bool {
 	return true
 }
 
-func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
-
-	return &pb.Mensaje{Msg: "Hello"}, nil
-
-}
 func chooseRandom() int {
+	rand.Seed(time.Now().UnixNano())
 	return rand.Intn(3)
 }
 
@@ -156,26 +154,6 @@ func enviarChunk(path string, numeroMaquina int, total int, numeroChunk int32, n
 
 }
 
-func (s *server) EnviarChunk(ctx context.Context, in *pb.ChunkSendToServer) (*pb.Mensaje, error) {
-
-	var (
-		name  string
-		chunk []byte
-		part  int32
-	)
-	name = in.GetNombre()
-	chunk = in.GetContenido()
-	part = in.GetNumeroChunk()
-	path := name + "/" + strconv.Itoa(int(part))
-
-	crearCarpeta(name)
-	crearArchivo(path)
-	escribirChunk(path, chunk)
-
-	return &pb.Mensaje{Msg: "ok"}, nil
-
-}
-
 func distribuirChunks(s1 int32, s2 int32, s3 int32, nombre string, total int) {
 	var i int32
 	totalf := s1 + s2 + s3
@@ -184,10 +162,10 @@ func distribuirChunks(s1 int32, s2 int32, s3 int32, nombre string, total int) {
 	corte := s1
 	corte2 := s1 + s2
 	for i = 0; i < totalf; i++ {
-		if i < corte2 {
+		if i >= corte && s2 > 0 && i < corte2 {
 			enviarChunk(path+fmt.Sprint(i), 2, total, i, nombre)
 			eliminarChunk(path + fmt.Sprint(i))
-		} else if i < corte {
+		} else if i < corte && s1 > 0 {
 			enviarChunk(path+fmt.Sprint(i), 1, total, i, nombre)
 			eliminarChunk(path + fmt.Sprint(i))
 		}
@@ -212,8 +190,8 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	re, _ := c.EnviarPropuesta(ctx,
-		&pb.Propuesta{Book: nombre, ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3), TotalChunks: int32(total)})
-	log.Printf("%v", re.GetMensaje())
+		&pb.Propuesta{Book: nombre, ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3), TotalChunks: int32(total), Ext: extBookInfo[nombre]})
+	log.Println("Se envio propuesta al NameNode")
 	var (
 		server1 int32
 		server2 int32
@@ -221,6 +199,9 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	)
 
 	server1, server2, server3 = re.GetChunkSendToServer1(), re.GetChunkSendToServer2(), re.GetChunkSendToServer3()
+
+	fmt.Print("Se recibio propuesta ", server1, server2, server3)
+	fmt.Println(" para distribuir el libro ", nombre)
 	distribuirChunks(server1, server2, server3, nombre, total)
 
 }
@@ -228,6 +209,52 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 func manejarPropuesta(total int, origen int, nombre string) {
 	s1, s2, s3 := generarPropuesta(total, origen)
 	enviarPropuesta(s1, s2, s3, nombre, total)
+}
+
+func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+
+	return &pb.Mensaje{Msg: "Hello"}, nil
+
+}
+
+func (s *server) EnviarChunk(ctx context.Context, in *pb.ChunkSendToServer) (*pb.Mensaje, error) {
+
+	var (
+		name  string
+		chunk []byte
+		part  int32
+	)
+	name = in.GetNombre()
+	chunk = in.GetContenido()
+	part = in.GetNumeroChunk()
+	path := name + "/" + strconv.Itoa(int(part))
+
+	crearCarpeta(name)
+	crearArchivo(path)
+	escribirChunk(path, chunk)
+
+	return &pb.Mensaje{Msg: "ok"}, nil
+
+}
+
+func (s *server) BajarChunk(ctx context.Context, in *pb.ChunkDes) (*pb.ChunkBook, error) {
+	var (
+		name  string
+		parte string
+	)
+	name = in.GetBook()
+	parte = in.GetPart()
+	path := name + "/" + parte
+
+	fi, _ := os.Stat(path)
+	file, _ := os.Open(path)
+
+	size := fi.Size()
+	partBuffer := make([]byte, size)
+	file.Read(partBuffer)
+
+	return &pb.ChunkBook{Contenido: partBuffer}, nil
+
 }
 
 func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, error) {
@@ -269,10 +296,32 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 	return &pb.UploadStatus{Mensaje: mensaje, Code: pb.UploadStatusCode_Ok}, nil
 }
 
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if strings.Compare(name, "dataNode3.go") != 0 && strings.Compare(name, "Makefile") != 0 {
+			err = os.RemoveAll(filepath.Join(dir, name))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func main() {
 	ipServer[1] = "localhost:50051"
 	ipServer[2] = "localhost:50052"
 	ipServer[3] = "localhost:50053"
+	removeContents("../DataNode3")
 
 	lis, err := net.Listen("tcp", port)
 	if err != nil {

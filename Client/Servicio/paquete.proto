@@ -13,7 +13,12 @@ service estructura_centralizada{
     rpc EnviarChunk(ChunkSendToServer)returns(Mensaje){ }
     rpc BajarArchivo(BookToDownload)returns (ListChunk){}
     rpc BajarChunk(ChunkDes)returns(ChunkBook){}
+    rpc ObtenerLibrosDisponibles(Mensaje) returns(Books){}
 
+}
+
+message Books{
+    repeated string Book = 1;
 }
 
 message ChunkDes{
@@ -27,6 +32,8 @@ message ChunkBook{
 
 message ListChunk{
     repeated string ChunkList = 1;
+    string ext = 2;
+
 }
 
 
@@ -62,6 +69,7 @@ message Propuesta{
   int32 ChunkSendToServer1 = 3;
   int32 ChunkSendToServer2 = 4;
   int32 ChunkSendToServer3 = 5;
+  string ext = 6;
     
 }
 message Chunk {
