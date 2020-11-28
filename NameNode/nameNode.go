@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	pb "google.golang.org/Tarea2SD/Client/Servicio"
@@ -128,7 +129,6 @@ func generarNuevaPropuesta(total int) (int, int, int) {
 		server[2] = true
 	}
 	return distribuirRandom(total, server)
-
 }
 
 func writeLogs(name string, s1 int, s2 int, s3 int) {
@@ -177,7 +177,7 @@ func (s *server) BajarArchivo(ctx context.Context, in *pb.BookToDownload) (*pb.L
 	var contador = 0
 	var listDirecciones []string
 
-	log.Println("se recibio un pedido a descargar el libro ", bookName)
+	log.Println("se recibio una solicitud a descargar el libro ", bookName)
 
 	breakN := true
 	c := false
@@ -217,6 +217,88 @@ func (s *server) ObtenerLibrosDisponibles(ctx context.Context, in *pb.Mensaje) (
 	return &pb.Books{Book: Books}, nil
 }
 
+var queueRecurso []int
+var numeroProceso int
+var recursoLiberado bool
+
+var procesOcupandoRecurso int
+
+func (s *server) WriteLogs(ctx context.Context, in *pb.Propuesta) (*pb.Mensaje, error) {
+	var (
+		name string
+		s1   int
+		s2   int
+		s3   int
+	)
+	name = in.GetBook()
+
+	s1 = int(in.GetChunkSendToServer1())
+
+	s2 = int(in.GetChunkSendToServer2())
+	s3 = int(in.GetChunkSendToServer3())
+
+	writeLogs(name, s1, s2, s3)
+
+	return &pb.Mensaje{Msg: "Accion realizada"}, nil
+
+}
+
+func (s *server) LiberarRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+	numeroProceso, _ := strconv.Atoi(in.GetMsg())
+
+	if numeroProceso == procesOcupandoRecurso {
+		recursoLiberado = true
+		procesOcupandoRecurso = -1
+		log.Printf("Recurso liberado por  %v", numeroProceso)
+		return &pb.Mensaje{Msg: "Liberado"}, nil
+	}
+
+	return &pb.Mensaje{Msg: "No le corresponde liberar"}, nil
+
+}
+
+func (s *server) PedirRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+	//Se mete a la cola el proceso
+
+	numeroAsignado := numeroProceso
+	numeroProceso++
+	log.Printf("Recurso solicitado por el proceso numero %v", numeroAsignado)
+
+	numeroString := strconv.Itoa(numeroAsignado)
+	//si el recurso esta liberado
+	if recursoLiberado && len(queueRecurso) == 0 {
+		log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
+		//Le Asigno el recurso
+		recursoLiberado = false
+		procesOcupandoRecurso = numeroAsignado
+		return &pb.Mensaje{Msg: numeroString}, nil
+	}
+	queueRecurso = append(queueRecurso, numeroAsignado)
+
+	for true {
+		if recursoLiberado {
+			if len(queueRecurso) == 0 {
+				log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
+				recursoLiberado = false
+				procesOcupandoRecurso = numeroAsignado
+				return &pb.Mensaje{Msg: numeroString}, nil
+			}
+			if queueRecurso[0] == numeroAsignado {
+				log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
+				recursoLiberado = false
+				queueRecurso = queueRecurso[1:]
+				procesOcupandoRecurso = numeroAsignado
+
+				return &pb.Mensaje{Msg: numeroString}, nil
+			}
+		}
+	}
+
+	return &pb.Mensaje{Msg: "No se puedo asignar el recurso en el tiempo maximo acordado"}, nil
+}
+
+var mutex = &sync.Mutex{}
+
 func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
 	var (
 		s1     int
@@ -229,17 +311,18 @@ func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Res
 	s2 = int(in.GetChunkSendToServer2())
 	s3 = int(in.GetChunkSendToServer3())
 	nombre = in.GetBook()
-	total = int(in.GetTotalChunks())
-	extBookInfo[nombre] = in.GetExt()
 
-	if analizarPropuesta(s1, s2, s3) {
-		log.Printf("Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
-		writeLogs(nombre, s1, s2, s3)
-		return &pb.Respuesta{Mensaje: "Ok", ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3)}, nil
+	total = int(in.GetTotalChunks())
+	mutex.Lock()
+	extBookInfo[nombre] = in.GetExt()
+	mutex.Unlock()
+
+	log.Printf("se recibio una Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
+	if !analizarPropuesta(s1, s2, s3) {
+		s1, s2, s3 = generarNuevaPropuesta(total)
+		log.Println("Propuesta rechazada")
+		log.Printf("Nueva Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
 	}
-	s1, s2, s3 = generarNuevaPropuesta(total)
-	writeLogs(nombre, s1, s2, s3)
-	log.Printf("Nueva Propuesta S1: %v S2: %v S3: %v", s1, s2, s3)
 	return &pb.Respuesta{Mensaje: "Ok", ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3)}, nil
 
 }
@@ -250,6 +333,10 @@ func cleanLogs() {
 }
 
 func main() {
+	numeroProceso = 0
+	recursoLiberado = true
+	procesOcupandoRecurso = -1
+
 	ipServer[1] = "localhost:50051"
 	ipServer[2] = "localhost:50052"
 	ipServer[3] = "localhost:50053"

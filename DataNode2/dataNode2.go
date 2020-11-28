@@ -224,8 +224,18 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	)
 
 	server1, server2, server3 = re.GetChunkSendToServer1(), re.GetChunkSendToServer2(), re.GetChunkSendToServer3()
-	fmt.Print("Se recibio propuesta", server1, server2, server3)
-	fmt.Println(" para distribuir el libro ", nombre)
+	log.Print("Se recibio propuesta " + strconv.Itoa(int(server1)) + " " + strconv.Itoa(int(server2)) + " " + strconv.Itoa(int(server3)) + " para distribuir el libro " + nombre)
+
+	//Escribir en el logs
+
+	re1, _ := c.PedirRecurso(ctx, &pb.Mensaje{Msg: "BookInfo.log"})
+	if re1.GetMsg() == "No se puedo asignar el recurso en el tiempo maximo acordado" {
+
+		return
+	}
+	numeroProceso := re1.GetMsg()
+	c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: server1, ChunkSendToServer2: server2, ChunkSendToServer3: server3})
+	c.LiberarRecurso(ctx, &pb.Mensaje{Msg: numeroProceso})
 
 	distribuirChunks(server1, server2, server3, nombre, total)
 

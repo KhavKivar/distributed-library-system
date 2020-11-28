@@ -16,7 +16,10 @@ service estructura_centralizada{
     rpc ObtenerLibrosDisponibles(Mensaje) returns(Books){}
 
     rpc PedirRecurso(Mensaje)returns(Mensaje){}
+
     rpc LiberarRecurso(Mensaje)returns(Mensaje){}
+    
+    
     rpc WriteLogs(Propuesta) returns(Mensaje){}
 
 }
