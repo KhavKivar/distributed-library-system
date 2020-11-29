@@ -120,7 +120,7 @@ func uploadFileRandom(f string, name string, etx string) {
 
 	rand.Seed(time.Now().UnixNano())
 	numeroRandom := rand.Intn(3)
-	elegido := conexiones[numeroRandom]
+	elegido := conexiones[0]
 	nServidor := numeroRandom + 1
 	fmt.Println("Enviando el libro "+name+" al Servidor", nServidor)
 	conn, err := grpc.Dial(elegido, grpc.WithInsecure())
@@ -129,7 +129,7 @@ func uploadFileRandom(f string, name string, etx string) {
 	}
 	defer conn.Close()
 	c := pb.NewEstructuraCentralizadaClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	uploadFile(ctx, c, f, name, etx)
 }

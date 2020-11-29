@@ -231,6 +231,7 @@ func (s *server) WriteLogs(ctx context.Context, in *pb.Propuesta) (*pb.Mensaje, 
 		s3   int
 	)
 	name = in.GetBook()
+	log.Printf("Proceso numero %v escribiendo en el logs", in.GetTotalChunks())
 
 	s1 = int(in.GetChunkSendToServer1())
 
@@ -257,11 +258,18 @@ func (s *server) LiberarRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaj
 
 }
 
-func (s *server) PedirRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
-	//Se mete a la cola el proceso
+var mutex1 = &sync.Mutex{}
 
+var contadorTiempo time.Time
+
+func (s *server) PedirRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+
+	//Se mete a la cola el proceso
+	mutex1.Lock()
 	numeroAsignado := numeroProceso
 	numeroProceso++
+	mutex1.Unlock()
+
 	log.Printf("Recurso solicitado por el proceso numero %v", numeroAsignado)
 
 	numeroString := strconv.Itoa(numeroAsignado)
@@ -269,32 +277,57 @@ func (s *server) PedirRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje,
 	if recursoLiberado && len(queueRecurso) == 0 {
 		log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
 		//Le Asigno el recurso
+		mutex1.Lock()
+
 		recursoLiberado = false
 		procesOcupandoRecurso = numeroAsignado
+		contadorTiempo = time.Now()
+
+		mutex1.Unlock()
 		return &pb.Mensaje{Msg: numeroString}, nil
 	}
 	queueRecurso = append(queueRecurso, numeroAsignado)
 
-	for true {
+	for start := time.Now(); time.Since(start) < time.Second; {
 		if recursoLiberado {
 			if len(queueRecurso) == 0 {
 				log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
+				mutex1.Lock()
 				recursoLiberado = false
 				procesOcupandoRecurso = numeroAsignado
+				contadorTiempo = time.Now()
+
+				mutex1.Unlock()
 				return &pb.Mensaje{Msg: numeroString}, nil
 			}
 			if queueRecurso[0] == numeroAsignado {
 				log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
+				mutex1.Lock()
 				recursoLiberado = false
 				queueRecurso = queueRecurso[1:]
+				contadorTiempo = time.Now()
+
 				procesOcupandoRecurso = numeroAsignado
+				mutex1.Unlock()
 
 				return &pb.Mensaje{Msg: numeroString}, nil
 			}
 		}
 	}
-
+	//Eliminar el proceso de la cola
+	for i := 0; i < len(queueRecurso); i++ {
+		if queueRecurso[i] == numeroAsignado {
+			mutex1.Lock()
+			queueRecurso = removeIndex(queueRecurso, i)
+			mutex1.Unlock()
+		}
+	}
 	return &pb.Mensaje{Msg: "No se puedo asignar el recurso en el tiempo maximo acordado"}, nil
+}
+
+func removeIndex(s []int, index int) []int {
+
+	return append(s[:index], s[index+1:]...)
 }
 
 var mutex = &sync.Mutex{}
@@ -349,7 +382,32 @@ func main() {
 	}
 	s := grpc.NewServer()
 	pb.RegisterEstructuraCentralizadaServer(s, &server{})
+	log.Printf("Server Iniciado")
+	go dispatcher()
+
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
+	}
+
+}
+
+func checkTime() {
+
+	if time.Since(contadorTiempo) > 300*time.Millisecond && recursoLiberado == false {
+
+		log.Printf("Recurso liberado a falta de respuesta")
+
+		recursoLiberado = true
+	}
+
+}
+
+func dispatcher() {
+	r1 := time.NewTicker(50 * time.Millisecond)
+	for {
+		select {
+		case <-r1.C:
+			checkTime()
+		}
 	}
 }
