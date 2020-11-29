@@ -203,18 +203,23 @@ func pedirRecurso(intentos int) int {
 	return msg
 }
 
-func writeLogspp(nombre string, s1 int32, s2 int32, s3 int32, numeroProceso int) {
+func writeLogspp(nombre string, s1 int32, s2 int32, s3 int32, numeroProceso int) bool {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
 	c := pb.NewEstructuraCentralizadaClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: s1, ChunkSendToServer2: s2, ChunkSendToServer3: s3, TotalChunks: int32(numeroProceso)})
-
+	re, _ := c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: s1, ChunkSendToServer2: s2, ChunkSendToServer3: s3, TotalChunks: int32(numeroProceso)})
+	log.Printf("Mensaje de writelogs %v", re.GetMsg())
+	if re.GetMsg() == "" {
+		return false
+	}
+	return true
 }
+
 func liberarRecurso(numeroProceso string) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
@@ -228,14 +233,24 @@ func liberarRecurso(numeroProceso string) {
 
 }
 
-func writeLogsProceso(nombre string, s1 int32, s2 int32, s3 int32) bool {
+func writeLogsProceso(nombre string, s1 int32, s2 int32, s3 int32, intentos int) bool {
+	time.Sleep(500 * time.Millisecond)
+	if intentos == 0 {
+		return false
+	}
+
 	//se pide el recurso
-	estado := pedirRecurso(8)
+	estado := pedirRecurso(4)
 	if estado == -1 {
 		return false
 	}
+
 	log.Printf("Proceso a escribir %v", estado)
-	writeLogspp(nombre, s1, s2, s3, estado)
+	resultado := writeLogspp(nombre, s1, s2, s3, estado)
+	if !resultado {
+		writeLogsProceso(nombre, s1, s2, s3, intentos-1)
+	}
+
 	liberarRecurso(strconv.Itoa(estado))
 	return true
 }
@@ -263,7 +278,7 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 
 	//Escribir en el logs
 
-	writeLogsProceso(nombre, server1, server2, server3)
+	writeLogsProceso(nombre, server1, server2, server3, 4)
 
 	distribuirChunks(server1, server2, server3, nombre, total)
 
