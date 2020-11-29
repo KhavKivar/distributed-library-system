@@ -337,9 +337,11 @@ func main() {
 	recursoLiberado = true
 	procesOcupandoRecurso = -1
 
-	ipServer[1] = "localhost:50051"
-	ipServer[2] = "localhost:50052"
-	ipServer[3] = "localhost:50053"
+	argsWithoutProg := os.Args[1:]
+
+	ipServer[1] = argsWithoutProg[0]
+	ipServer[2] = argsWithoutProg[1]
+	ipServer[3] = argsWithoutProg[2]
 	cleanLogs()
 	lis, err := net.Listen("tcp", port)
 	if err != nil {

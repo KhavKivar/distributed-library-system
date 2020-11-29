@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	port    = ":50051"
-	address = "localhost:50055"
+	port = ":50051"
 )
 
+var address string
 var ipServer = make(map[int]string)
 
 // server is used to implement helloworld.GreeterServer.
@@ -332,9 +332,13 @@ func removeContents(dir string) error {
 }
 
 func main() {
-	ipServer[1] = "localhost:50051"
-	ipServer[2] = "localhost:50052"
-	ipServer[3] = "localhost:50053"
+	argsWithoutProg := os.Args[1:]
+
+	address = argsWithoutProg[3]
+
+	ipServer[1] = argsWithoutProg[0]
+	ipServer[2] = argsWithoutProg[1]
+	ipServer[3] = argsWithoutProg[2]
 
 	removeContents("../DataNode1")
 	lis, err := net.Listen("tcp", port)

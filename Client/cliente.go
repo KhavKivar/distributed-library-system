@@ -18,12 +18,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	address1 = "localhost:50051"
-	address2 = "localhost:50052"
-	address3 = "localhost:50053"
-)
-
 func uploadFile(ctx context.Context, c pb.EstructuraCentralizadaClient, f string, name string, etx string) (stats pb.UploadStatus, err error) {
 	fileToBeChunked := f
 	file, err := os.Open(fileToBeChunked)
@@ -75,7 +69,7 @@ func bajarChunk(dir string, name string, parte string) []byte {
 }
 
 func bajarArchivo(name string) {
-	conn, err := grpc.Dial("localhost:50055", grpc.WithInsecure())
+	conn, err := grpc.Dial(address4, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -108,7 +102,7 @@ func bajarArchivo(name string) {
 	log.Printf("Archivo bajado con exito")
 }
 func verLibrosDisponibles() []string {
-	conn, err := grpc.Dial("localhost:50055", grpc.WithInsecure())
+	conn, err := grpc.Dial(address4, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -122,7 +116,7 @@ func verLibrosDisponibles() []string {
 }
 
 func uploadFileRandom(f string, name string, etx string) {
-	conexiones := [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+	conexiones := [3]string{address1, address2, address3}
 
 	rand.Seed(time.Now().UnixNano())
 	numeroRandom := rand.Intn(3)
@@ -164,7 +158,20 @@ func rutinaUploadFiles(folder string, dontInclude string) {
 
 }
 
+var address1 string
+var address2 string
+var address3 string
+var address4 string
+
 func main() {
+
+	argsWithoutProg := os.Args[1:]
+
+	address1 = argsWithoutProg[0]
+	address2 = argsWithoutProg[1]
+	address3 = argsWithoutProg[2]
+	address4 = argsWithoutProg[3]
+
 	for true {
 
 		reader := bufio.NewReader(os.Stdin)
