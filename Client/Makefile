@@ -6,3 +6,5 @@ build:
 
 run:
 	go run cliente.go localhost:50051 localhost:50052 localhost:50053 localhost:50055
+test:
+	gi rub
