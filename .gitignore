@@ -1,0 +1,5 @@
+./Client/Makefile
+./DataNode1/Makefile
+./DataNode2/Makefile
+./DataNode3/Makefile
+./NameNode/Makefile
