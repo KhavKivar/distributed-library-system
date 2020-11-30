@@ -288,7 +288,7 @@ func (s *server) PedirRecurso(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje,
 	}
 	queueRecurso = append(queueRecurso, numeroAsignado)
 
-	for start := time.Now(); time.Since(start) < time.Second; {
+	for start := time.Now(); time.Since(start) < 4*time.Second; {
 		if recursoLiberado {
 			if len(queueRecurso) == 0 {
 				log.Printf("Recurso Asignado al proceso numero  %v", numeroAsignado)
@@ -393,7 +393,7 @@ func main() {
 
 func checkTime() {
 
-	if time.Since(contadorTiempo) > 300*time.Millisecond && recursoLiberado == false {
+	if time.Since(contadorTiempo) > 5000*time.Millisecond && recursoLiberado == false {
 
 		log.Printf("Recurso liberado a falta de respuesta")
 
