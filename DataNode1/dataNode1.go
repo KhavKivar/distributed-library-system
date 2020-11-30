@@ -190,14 +190,14 @@ func pedirRecurso(intentos int, libro string) int {
 	}
 	defer conn.Close()
 	c := pb.NewEstructuraCentralizadaClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(),5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	re, _ := c.PedirRecurso(ctx, &pb.Mensaje{Msg: "BookInfo.log"})
 	if re.GetMsg() == "No se puedo asignar el recurso en el tiempo maximo acordado" || re.GetMsg() == "" {
 		log.Printf("No se puedo pedir el recurso en el intento %v por el libro %v", intentos, libro)
 		time.Sleep(500 * time.Millisecond)
-		return pedirRecurso(intentos - 1,libro)
+		return pedirRecurso(intentos-1, libro)
 	}
 	msg, _ := strconv.Atoi(re.GetMsg())
 	return msg
@@ -240,7 +240,7 @@ func writeLogsProceso(nombre string, s1 int32, s2 int32, s3 int32, intentos int)
 	}
 
 	//se pide el recurso
-	estado := pedirRecurso(4,nombre)
+	estado := pedirRecurso(4, nombre)
 	if estado == -1 {
 		return false
 	}
@@ -390,7 +390,7 @@ func removeContents(dir string) error {
 	}
 	for _, name := range names {
 
-		if strings.Compare(name, "dataNode1.go") != 0 && strings.Compare(name, "Makefile") != 0 {
+		if strings.Compare(name, "dataNode1.go") != 0 && strings.Compare(name, "Makefile") != 0 && strings.Compare(name, "makefile.win") != 0 {
 			err = os.RemoveAll(filepath.Join(dir, name))
 			if err != nil {
 				return err

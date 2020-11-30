@@ -179,6 +179,83 @@ func generarPropuesta(total int, origen int) (int, int, int) {
 	return distribuirRandom(total)
 }
 
+func pedirRecurso(intentos int, libro string) int {
+
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if intentos == 0 {
+		return -1
+
+	}
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	re, _ := c.PedirRecurso(ctx, &pb.Mensaje{Msg: "BookInfo.log"})
+	if re.GetMsg() == "No se puedo asignar el recurso en el tiempo maximo acordado" || re.GetMsg() == "" {
+		log.Printf("No se puedo pedir el recurso en el intento %v por el libro %v", intentos, libro)
+		time.Sleep(500 * time.Millisecond)
+		return pedirRecurso(intentos-1, libro)
+	}
+	msg, _ := strconv.Atoi(re.GetMsg())
+	return msg
+}
+
+func writeLogspp(nombre string, s1 int32, s2 int32, s3 int32, numeroProceso int) bool {
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	re, _ := c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: s1, ChunkSendToServer2: s2, ChunkSendToServer3: s3, TotalChunks: int32(numeroProceso)})
+	log.Printf("Mensaje de writelogs %v", re.GetMsg())
+	if re.GetMsg() == "" {
+		return false
+	}
+	return true
+}
+
+func liberarRecurso(numeroProceso string) {
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	c.LiberarRecurso(ctx, &pb.Mensaje{Msg: numeroProceso})
+
+}
+
+func writeLogsProceso(nombre string, s1 int32, s2 int32, s3 int32, intentos int) bool {
+	time.Sleep(500 * time.Millisecond)
+	if intentos == 0 {
+		return false
+	}
+
+	//se pide el recurso
+	estado := pedirRecurso(4, nombre)
+	if estado == -1 {
+		return false
+	}
+
+	log.Printf("Proceso a escribir %v", estado)
+	resultado := writeLogspp(nombre, s1, s2, s3, estado)
+	if !resultado {
+		writeLogsProceso(nombre, s1, s2, s3, intentos-1)
+	}
+
+	liberarRecurso(strconv.Itoa(estado))
+	return true
+}
+
 func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
@@ -201,16 +278,7 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 
 	log.Print("Se recibio propuesta " + strconv.Itoa(int(server1)) + " " + strconv.Itoa(int(server2)) + " " + strconv.Itoa(int(server3)) + " para distribuir el libro " + nombre)
 
-	//Escribir en el logs
-
-	re1, _ := c.PedirRecurso(ctx, &pb.Mensaje{Msg: "BookInfo.log"})
-	if re1.GetMsg() == "No se puedo asignar el recurso en el tiempo maximo acordado" {
-
-		return
-	}
-	numeroProceso := re1.GetMsg()
-	c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: server1, ChunkSendToServer2: server2, ChunkSendToServer3: server3})
-	c.LiberarRecurso(ctx, &pb.Mensaje{Msg: numeroProceso})
+	writeLogsProceso(nombre, server1, server2, server3, 4)
 
 	distribuirChunks(server1, server2, server3, nombre, total)
 
@@ -317,7 +385,7 @@ func removeContents(dir string) error {
 		return err
 	}
 	for _, name := range names {
-		if strings.Compare(name, "dataNode3.go") != 0 && strings.Compare(name, "Makefile") != 0 {
+		if strings.Compare(name, "dataNode3.go") != 0 && strings.Compare(name, "Makefile") != 0 && strings.Compare(name, "makefile.win") != 0 {
 			err = os.RemoveAll(filepath.Join(dir, name))
 			if err != nil {
 				return err
@@ -346,6 +414,7 @@ func main() {
 	}
 	s := grpc.NewServer()
 	pb.RegisterEstructuraCentralizadaServer(s, &server{})
+	log.Printf("Server Iniciado")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
