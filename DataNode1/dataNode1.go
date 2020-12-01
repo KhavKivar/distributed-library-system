@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	pb "google.golang.org/Tarea2SD/Client/Servicio"
@@ -27,6 +28,121 @@ var ipServer = make(map[int]string)
 // server is used to implement helloworld.GreeterServer.
 type server struct {
 	pb.UnimplementedEstructuraCentralizadaServer
+}
+
+var extBookInfo = make(map[string]string)
+var totalPartBook = make(map[string]int32)
+var queue []string
+
+func (s *server) BajarChunk(ctx context.Context, in *pb.ChunkDes) (*pb.ChunkBook, error) {
+	var (
+		name  string
+		parte string
+	)
+	name = in.GetBook()
+	parte = in.GetPart()
+	path := name + "/" + parte
+
+	fi, _ := os.Stat(path)
+	file, _ := os.Open(path)
+
+	size := fi.Size()
+	partBuffer := make([]byte, size)
+	file.Read(partBuffer)
+
+	return &pb.ChunkBook{Contenido: partBuffer}, nil
+
+}
+
+func (s *server) EnviarChunk(ctx context.Context, in *pb.ChunkSendToServer) (*pb.Mensaje, error) {
+
+	var (
+		name  string
+		chunk []byte
+		part  int32
+	)
+	name = in.GetNombre()
+	chunk = in.GetContenido()
+	part = in.GetNumeroChunk()
+	path := name + "/" + strconv.Itoa(int(part))
+
+	crearCarpeta(name)
+	crearArchivo(path)
+	escribirChunk(path, chunk)
+
+	return &pb.Mensaje{Msg: "ok"}, nil
+
+}
+
+func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+
+	return &pb.Mensaje{Msg: "Hello"}, nil
+}
+
+func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, error) {
+	var (
+		chunk   []byte
+		total   int32
+		part    int32
+		nombre  string
+		ext     string
+		exito   bool
+		mensaje string
+	)
+	chunk = in.GetContenido()
+	total = in.GetTotalChunks()
+	part = in.GetNumeroChunk()
+	nombre = in.GetNombre()
+	ext = in.GetExt()
+	exito = false
+
+	path := nombre + "/" + strconv.Itoa(int(part))
+
+	crearCarpeta(nombre)
+	crearArchivo(path)
+	escribirChunk(path, chunk)
+
+	if part == (total - 1) {
+
+		extBookInfo[nombre] = ext
+		totalPartBook[nombre] = total
+
+		queue = append(queue, nombre)
+
+		if verificarSubida(nombre) {
+			exito = true
+			go manejarPropuesta(int(total), 1, nombre)
+		}
+	}
+
+	mensaje = "ChunkRecibido"
+	if exito {
+		mensaje = "Recibido"
+	}
+	return &pb.UploadStatus{Mensaje: mensaje, Code: pb.UploadStatusCode_Ok}, nil
+}
+
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+
+		if strings.Compare(name, "dataNode1.go") != 0 && strings.Compare(name, "Makefile") != 0 && strings.Compare(name, "makefile.win") != 0 {
+			err = os.RemoveAll(filepath.Join(dir, name))
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
 }
 
 func crearCarpeta(nombreCarpeta string) bool {
@@ -52,10 +168,6 @@ func crearArchivo(path string) bool {
 func escribirChunk(filename string, chunk []byte) {
 	ioutil.WriteFile(filename, chunk, os.ModeAppend)
 }
-
-var extBookInfo = make(map[string]string)
-var totalPartBook = make(map[string]int32)
-var queue []string
 
 func verificarSubida(nameBook string) bool {
 	totalpart := totalPartBook[nameBook]
@@ -213,7 +325,6 @@ func writeLogspp(nombre string, s1 int32, s2 int32, s3 int32, numeroProceso int)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	re, _ := c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: s1, ChunkSendToServer2: s2, ChunkSendToServer3: s3, TotalChunks: int32(numeroProceso)})
-	log.Printf("Mensaje de writelogs %v", re.GetMsg())
 	if re.GetMsg() == "" {
 		return false
 	}
@@ -274,7 +385,6 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 	)
 
 	server1, server2, server3 = re.GetChunkSendToServer1(), re.GetChunkSendToServer2(), re.GetChunkSendToServer3()
-	log.Print("Se recibio propuesta " + strconv.Itoa(int(server1)) + " " + strconv.Itoa(int(server2)) + " " + strconv.Itoa(int(server3)) + " para distribuir el libro " + nombre)
 
 	//Escribir en el logs
 
@@ -284,58 +394,300 @@ func enviarPropuesta(s1 int, s2 int, s3 int, nombre string, total int) {
 
 }
 
+/*FUNCIONES DISTRIBUIDAS
+//
+//
+//
+//
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
+
+var estadoRecurso string
+var queueSolicitudes []int
+var mutex = &sync.Mutex{}
+var lamportClock int
+var numeroMaquinaid int = 1
+var receivedAllreplies bool
+var contadorReplies int
+var waitingForSend bool
+
+type waitingSafe struct {
+	sync.RWMutex
+	waitingForSend bool
+}
+
+var waitingForSendStruct = &waitingSafe{}
+
+func (waitingForSendStruct *waitingSafe) Get() bool {
+	waitingForSendStruct.RLock()
+	waitingForSendStruct.RUnlock()
+	return waitingForSendStruct.waitingForSend
+}
+func (waitingForSendStruct *waitingSafe) set(x bool) {
+	waitingForSendStruct.Lock()
+	waitingForSendStruct.waitingForSend = x
+	waitingForSendStruct.Unlock()
+}
+
+func enviarPropuestaAlservidorX(s1 int, s2 int, s3 int, nombre string, total int, nservidor int) bool {
+	conn, err := grpc.Dial(ipServer[nservidor], grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	re, _ := c.EnviarPropuesta(ctx,
+		&pb.Propuesta{Book: nombre, ChunkSendToServer1: int32(s1), ChunkSendToServer2: int32(s2), ChunkSendToServer3: int32(s3), TotalChunks: int32(total), Ext: extBookInfo[nombre]})
+	if re.GetMensaje() == "Propuesta Aceptada" {
+		return true
+	}
+	return false
+}
+
+func enviarPropuestaFor(s1 int, s2 int, s3 int, nombre string, total int) bool {
+	c1 := enviarPropuestaAlservidorX(s1, s2, s3, nombre, total, 2)
+	c2 := enviarPropuestaAlservidorX(s1, s2, s3, nombre, total, 3)
+	if c1 && c2 {
+		//Ambos nodos aceptaron la propuesta
+		return true
+	}
+	return false
+}
+
+func enviarPropuestaDistribuida(s1 int, s2 int, s3 int, nombre string, total int) bool {
+	//Lo intentamos tres veces si no gg..
+
+	res := enviarPropuestaFor(s1, s2, s3, nombre, total)
+
+	if res {
+		log.Printf("Propuesta aceptada por todos los nodos en el intento 0 Propuesta: %v %v %v", s1, s2, s3)
+		return true
+	}
+	//intentamos nuevamente
+
+	s1, s2, s3 = generarPropuesta(total, 1)
+
+	res = enviarPropuestaFor(s1, s2, s3, nombre, total)
+	if res {
+		log.Printf("Propuesta aceptada por todos los nodos en el intento 1  Propuesta:s%v %v %v", s1, s2, s3)
+		return true
+	}
+	//intentamos nuevamente
+	s1, s2, s3 = generarPropuesta(total, 1)
+	res = enviarPropuestaFor(s1, s2, s3, nombre, total)
+	if res {
+		log.Printf("Propuesta aceptada por todos los nodos en el intento 2 Propuesta: %v %v %v", s1, s2, s3)
+		return true
+	}
+	return false
+}
+
+func random99() bool {
+	rand.Seed(time.Now().UnixNano())
+	numeroRandom := rand.Intn(100)
+	if numeroRandom < 99 {
+		return true
+	}
+	return false
+
+}
+
+func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
+
+	if random99() {
+		return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
+	}
+	return &pb.Respuesta{Mensaje: "Propuesta Rechazada"}, nil
+}
+
 func manejarPropuesta(total int, origen int, nombre string) {
 	s1, s2, s3 := generarPropuesta(total, origen)
 	enviarPropuesta(s1, s2, s3, nombre, total)
 }
 
-func (s *server) BajarChunk(ctx context.Context, in *pb.ChunkDes) (*pb.ChunkBook, error) {
-	var (
-		name  string
-		parte string
-	)
-	name = in.GetBook()
-	parte = in.GetPart()
-	path := name + "/" + parte
+func enviarMensajeDeAutorizacion(maquina int, destino int) string {
 
-	fi, _ := os.Stat(path)
-	file, _ := os.Open(path)
+	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	log.Printf("Enviando mensajes para autorizar Maquina:%v reloj : %v", maquina, lamportClock)
+	re, _ := c.DarPermiso(ctx, &pb.Solicitud{Maquina: int32(maquina), RelojLamport: int32(lamportClock)})
+	return re.GetMsg()
+}
 
-	size := fi.Size()
-	partBuffer := make([]byte, size)
-	file.Read(partBuffer)
+func replyQueue() {
+	for waitingForSendStruct.Get() {
 
-	return &pb.ChunkBook{Contenido: partBuffer}, nil
+	}
+	for i := 0; i < len(queueSolicitudes); i++ {
+		//send reply
+		log.Printf("ALL REPLY OK-> Servidor %v", queueSolicitudes[i])
+		aceptarSolicitudAltiro(queueSolicitudes[i])
+	}
+	queueSolicitudes = make([]int, 0)
+}
+
+func maxValue(x int, y int) int {
+	if x > y {
+		return x
+	}
+	return y
 
 }
 
-func (s *server) EnviarChunk(ctx context.Context, in *pb.ChunkSendToServer) (*pb.Mensaje, error) {
+func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
+	mutex.Lock()
+	estado := estadoRecurso
+	mutex.Unlock()
 
-	var (
-		name  string
-		chunk []byte
-		part  int32
-	)
-	name = in.GetNombre()
-	chunk = in.GetContenido()
-	part = in.GetNumeroChunk()
-	path := name + "/" + strconv.Itoa(int(part))
+	if estado == "WANTED" || estado == "HELD" {
+		//esperamos a que lo libere
+		for true {
+			if estadoRecurso == "RELEASED" {
+				break
+			}
+		}
+	}
+	waitingForSendStruct.set(true)
+	mutex.Lock()
+	estadoRecurso = "WANTED"
+	lamportClock = lamportClock + 1
+	mutex.Unlock()
 
-	crearCarpeta(name)
-	crearArchivo(path)
-	escribirChunk(path, chunk)
+	contadorReplies = 2
 
-	return &pb.Mensaje{Msg: "ok"}, nil
+	enviarMensajeDeAutorizacion(1, 2)
+	enviarMensajeDeAutorizacion(1, 3)
+
+	waitingForSendStruct.set(false)
+
+	//Difusion de los mensajes recordar el aplazamiento
+	for !receivedAllreplies {
+	}
+	mutex.Lock()
+	estadoRecurso = "HELD"
+	mutex.Unlock()
+	//Escribir en elogs
+	//Liberar
+
+	log.Printf("Writting bookInfo.log proposal: %v %v %v  Book:  %v", s1, s2, s3, nombre)
+
+	writeLogspp(nombre, int32(s1), int32(s2), int32(s3), 1)
+
+	mutex.Lock()
+	estadoRecurso = "RELEASED"
+	mutex.Unlock()
+	receivedAllreplies = false
+	replyQueue()
 
 }
 
-func (s *server) VerificarEstadoServidor(ctx context.Context, in *pb.Mensaje) (*pb.Mensaje, error) {
+func aceptarSolicitudAltiro(destino int) string {
+	for waitingForSendStruct.Get() {
 
-	return &pb.Mensaje{Msg: "Hello"}, nil
+	}
+
+	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	re, _ := c.AceptarSolicitud(ctx, &pb.Solicitud{RelojLamport: int32(lamportClock), Maquina: int32(numeroMaquinaid)})
+	return re.GetMsg()
+}
+
+func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
+	//Actualizamos el reloj
+	for waitingForSendStruct.Get() {
+
+	}
+
+	log.Printf("one reply llego del servidor %v", in.GetMaquina())
+	relojComing := int(in.GetRelojLamport())
+	lamportClock = maxValue(lamportClock, relojComing) + 1
+
+	if estadoRecurso == "WANTED" {
+		contadorReplies = contadorReplies - 1
+		if contadorReplies == 0 {
+			receivedAllreplies = true
+		}
+	}
+
+	return &pb.Mensaje{Msg: "KK"}, nil
 
 }
 
-func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, error) {
+func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
+	for waitingForSendStruct.Get() {
+
+	}
+
+	relojComing := int(in.GetRelojLamport())
+	procesoNumber := int(in.GetMaquina())
+
+	log.Printf("T1: %v T2: %v Maquina  %v", lamportClock, relojComing, in.GetMaquina())
+
+	if estadoRecurso == "HELD" || (estadoRecurso == "WANTED" && (lamportClock < relojComing || lamportClock == relojComing)) {
+		if lamportClock == relojComing && estadoRecurso == "WANTED" {
+			if numeroMaquinaid < procesoNumber {
+				mutex.Lock()
+				lamportClock = maxValue(lamportClock, relojComing) + 1
+				mutex.Unlock()
+				log.Printf("OK -> Servidor %v ", procesoNumber)
+				go aceptarSolicitudAltiro(procesoNumber)
+				return &pb.Mensaje{Msg: "OK"}, nil
+			}
+		}
+	} else {
+		mutex.Lock()
+		lamportClock = maxValue(lamportClock, relojComing) + 1
+		mutex.Unlock()
+		log.Printf("OK -> Servidor %v", procesoNumber)
+		go aceptarSolicitudAltiro(procesoNumber)
+		return &pb.Mensaje{Msg: "OK"}, nil
+	}
+
+	//Lo encolo
+	log.Printf("Lo encolo")
+	queueSolicitudes = append(queueSolicitudes, procesoNumber)
+	lamportClock = maxValue(lamportClock, relojComing) + 1
+
+	return &pb.Mensaje{Msg: "NO"}, nil
+}
+
+func manejarPropuestaDistribuida(total int, origen int, nombre string) {
+	s1, s2, s3 := generarPropuesta(total, origen)
+	if enviarPropuestaDistribuida(s1, s2, s3, nombre, total) {
+		//Ricart y Agrawala
+		writeLogsDistribuido(s1, s2, s3, nombre, total)
+	} else {
+		log.Printf("Los servidores no aceptaron la propuesta tres veces seguidas")
+	}
+}
+
+func (s *server) SubirDistribuida(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, error) {
 	var (
 		chunk   []byte
 		total   int32
@@ -367,7 +719,7 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 
 		if verificarSubida(nombre) {
 			exito = true
-			go manejarPropuesta(int(total), 1, nombre)
+			go manejarPropuestaDistribuida(int(total), 1, nombre)
 		}
 	}
 
@@ -378,34 +730,18 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 	return &pb.UploadStatus{Mensaje: mensaje, Code: pb.UploadStatusCode_Ok}, nil
 }
 
-func removeContents(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-	names, err := d.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-	for _, name := range names {
-
-		if strings.Compare(name, "dataNode1.go") != 0 && strings.Compare(name, "Makefile") != 0 && strings.Compare(name, "makefile.win") != 0 {
-			err = os.RemoveAll(filepath.Join(dir, name))
-			if err != nil {
-				return err
-			}
-		}
-
-	}
-	return nil
-}
-
 func main() {
+
+	lamportClock = 0
+	estadoRecurso = "RELEASED"
+	contadorReplies = 2
+	receivedAllreplies = false
+	waitingForSend = false
+
+	waitingForSendStruct.set(false)
+
 	argsWithoutProg := os.Args[1:]
-
 	address = argsWithoutProg[3]
-
 	ipServer[1] = argsWithoutProg[0]
 	ipServer[2] = argsWithoutProg[1]
 	ipServer[3] = argsWithoutProg[2]
