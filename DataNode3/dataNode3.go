@@ -459,8 +459,7 @@ func (waitingForSendStruct *waitingSafe) set(x bool) {
 }
 
 func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-	for waitingForSendStruct.Get() {
-
+	for waitingForSend {
 	}
 
 	relojComing := int(in.GetRelojLamport())
@@ -511,9 +510,6 @@ func enviarMensajeDeAutorizacion(destino int) string {
 }
 
 func replyQueue() {
-	for waitingForSendStruct.Get() {
-
-	}
 
 	for i := 0; i < len(queueSolicitudes); i++ {
 		//send reply
@@ -525,21 +521,22 @@ func replyQueue() {
 }
 
 func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
-	mutex.Lock()
-	estado := estadoRecurso
-	mutex.Unlock()
+	/*
+		mutex.Lock()
+		estado := estadoRecurso
+		mutex.Unlock()
 
-	if estado == "WANTED" || estado == "HELD" {
-		//esperamos a que lo libere
-		for true {
-			if estadoRecurso == "RELEASED" {
-				break
+			if estado == "WANTED" || estado == "HELD" {
+				//esperamos a que lo libere
+				for true {
+					if estadoRecurso == "RELEASED" {
+						break
+					}
+				}
 			}
-		}
-	}
-	waitingForSendStruct.set(true)
+	*/
 	mutex.Lock()
-
+	waitingForSend = true
 	estadoRecurso = "WANTED"
 	lamportClock = lamportClock + 1
 	mutex.Unlock()
@@ -547,9 +544,10 @@ func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
 	contadorReplies = 2
 
 	//Difusion de los mensajes recordar el aplazamiento
+	log.Printf("Libro :%v", nombre)
 	enviarMensajeDeAutorizacion(1)
 	enviarMensajeDeAutorizacion(2)
-	waitingForSendStruct.set(false)
+	waitingForSend = false
 
 	for !receivedAllreplies {
 	}
@@ -572,9 +570,6 @@ func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
 }
 
 func aceptarSolicitudAltiro(destino int) string {
-	for waitingForSendStruct.Get() {
-
-	}
 
 	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
 	if err != nil {
@@ -590,9 +585,6 @@ func aceptarSolicitudAltiro(destino int) string {
 }
 
 func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-	for waitingForSendStruct.Get() {
-
-	}
 
 	relojComing := int(in.GetRelojLamport())
 	lamportClock = maxValue(lamportClock, relojComing) + 1
@@ -729,6 +721,7 @@ func main() {
 	contadorReplies = 2
 	receivedAllreplies = false
 	waitingForSend = false
+	waitingForSendStruct.set(false)
 
 	argsWithoutProg := os.Args[1:]
 	address = argsWithoutProg[3]

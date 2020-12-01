@@ -462,9 +462,6 @@ func random99() bool {
 }
 
 func aceptarSolicitudAltiro(destino int) string {
-	for waitingForSendStruct.Get() {
-
-	}
 
 	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
 	if err != nil {
@@ -480,9 +477,6 @@ func aceptarSolicitudAltiro(destino int) string {
 }
 
 func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-	for waitingForSendStruct.Get() {
-
-	}
 
 	relojComing := int(in.GetRelojLamport())
 	lamportClock = maxValue(lamportClock, relojComing) + 1
@@ -497,7 +491,7 @@ func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Me
 }
 
 func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-	for waitingForSendStruct.Get() {
+	for waitingForSend {
 
 	}
 
@@ -557,30 +551,31 @@ func replyQueue() {
 }
 
 func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
-	mutex.Lock()
-	estado := estadoRecurso
-	mutex.Unlock()
+	/*
+		mutex.Lock()
+		estado := estadoRecurso
+		mutex.Unlock()
 
-	if estado == "WANTED" || estado == "HELD" {
-		//esperamos a que lo libere
-		for true {
-			if estadoRecurso == "RELEASED" {
-				break
+			if estado == "WANTED" || estado == "HELD" {
+				//esperamos a que lo libere
+				for true {
+					if estadoRecurso == "RELEASED" {
+						break
+					}
+				}
 			}
-		}
-	}
-	waitingForSendStruct.set(true)
+	*/
 	mutex.Lock()
-
+	waitingForSend = true
 	estadoRecurso = "WANTED"
 	lamportClock = lamportClock + 1
 	mutex.Unlock()
 
 	contadorReplies = 2
-
+	log.Printf("Libro :%v", nombre)
 	enviarMensajeDeAutorizacion(2, 1)
 	enviarMensajeDeAutorizacion(2, 3)
-	waitingForSendStruct.set(false)
+	waitingForSend = false
 
 	for !receivedAllreplies {
 	}

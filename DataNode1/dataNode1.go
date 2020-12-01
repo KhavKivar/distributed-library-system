@@ -421,6 +421,7 @@ var lamportClock int
 var numeroMaquinaid int = 1
 var receivedAllreplies bool
 var contadorReplies int
+
 var waitingForSend bool
 
 type waitingSafe struct {
@@ -507,7 +508,6 @@ func random99() bool {
 }
 
 func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
-
 	if random99() {
 		return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
 	}
@@ -535,9 +535,7 @@ func enviarMensajeDeAutorizacion(maquina int, destino int) string {
 }
 
 func replyQueue() {
-	for waitingForSendStruct.Get() {
 
-	}
 	for i := 0; i < len(queueSolicitudes); i++ {
 		//send reply
 		log.Printf("ALL REPLY OK-> Servidor %v", queueSolicitudes[i])
@@ -555,30 +553,32 @@ func maxValue(x int, y int) int {
 }
 
 func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
-	mutex.Lock()
-	estado := estadoRecurso
-	mutex.Unlock()
 
-	if estado == "WANTED" || estado == "HELD" {
-		//esperamos a que lo libere
-		for true {
-			if estadoRecurso == "RELEASED" {
-				break
+	/*	mutex.Lock()
+		estado := estadoRecurso
+		mutex.Unlock()
+
+		if estado == "WANTED" || estado == "HELD" {
+			//esperamos a que lo libere
+			for true {
+				if estadoRecurso == "RELEASED" {
+					break
+				}
 			}
-		}
-	}
-	waitingForSendStruct.set(true)
+		}*/
+
 	mutex.Lock()
+	waitingForSend = true
 	estadoRecurso = "WANTED"
 	lamportClock = lamportClock + 1
 	mutex.Unlock()
 
 	contadorReplies = 2
-
+	log.Printf("Libro :%v", nombre)
 	enviarMensajeDeAutorizacion(1, 2)
 	enviarMensajeDeAutorizacion(1, 3)
 
-	waitingForSendStruct.set(false)
+	waitingForSend = false
 
 	//Difusion de los mensajes recordar el aplazamiento
 	for !receivedAllreplies {
@@ -602,9 +602,6 @@ func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
 }
 
 func aceptarSolicitudAltiro(destino int) string {
-	for waitingForSendStruct.Get() {
-
-	}
 
 	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
 	if err != nil {
@@ -620,9 +617,6 @@ func aceptarSolicitudAltiro(destino int) string {
 
 func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
 	//Actualizamos el reloj
-	for waitingForSendStruct.Get() {
-
-	}
 
 	log.Printf("one reply llego del servidor %v", in.GetMaquina())
 	relojComing := int(in.GetRelojLamport())
@@ -640,7 +634,7 @@ func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Me
 }
 
 func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-	for waitingForSendStruct.Get() {
+	for waitingForSend {
 
 	}
 
@@ -680,6 +674,7 @@ func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje,
 func manejarPropuestaDistribuida(total int, origen int, nombre string) {
 	s1, s2, s3 := generarPropuesta(total, origen)
 	if enviarPropuestaDistribuida(s1, s2, s3, nombre, total) {
+
 		//Ricart y Agrawala
 		writeLogsDistribuido(s1, s2, s3, nombre, total)
 	} else {

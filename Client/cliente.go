@@ -145,7 +145,7 @@ func rutinaUploadFilesDistribuido(folder string, dontInclude string) {
 			bookName := strings.Split(bookWithExt, ".")[0]
 
 			path := folder + "/" + bookWithExt
-			go uploadFileRandomDistribuido(path, bookName, ext)
+			uploadFileRandomDistribuido(path, bookName, ext)
 		}
 	}
 }
