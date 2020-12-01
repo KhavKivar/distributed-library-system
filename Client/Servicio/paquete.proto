@@ -5,8 +5,10 @@ option go_package = "google.golang.org/Tarea2SD/Client/Servicio";
 package paquete;
 
 
-// Servicios usados para la implementacion de la estructura centralizada
+
 service estructura_centralizada{
+
+// Servicios usados para la implementacion de la estructura centralizada
     rpc Subir(Chunk) returns (UploadStatus){}
     rpc EnviarPropuesta (Propuesta)returns (Respuesta){}
     rpc VerificarEstadoServidor(Mensaje) returns (Mensaje){}
@@ -16,11 +18,20 @@ service estructura_centralizada{
     rpc ObtenerLibrosDisponibles(Mensaje) returns(Books){}
 
     rpc PedirRecurso(Mensaje)returns(Mensaje){}
-
     rpc LiberarRecurso(Mensaje)returns(Mensaje){}
-    
-    
     rpc WriteLogs(Propuesta) returns(Mensaje){}
+
+    // Servicios usados para la implementacion de la estructura distribuida
+
+    rpc SubirDistribuida(Chunk) returns(UploadStatus){}
+    rpc DarPermiso(Solicitud)returns(Mensaje){}
+    rpc AceptarSolicitud(Solicitud)returns(Mensaje){}
+    
+}
+
+message Solicitud{
+    int32 maquina = 1;
+    int32 relojLamport = 2;
 
 }
 
