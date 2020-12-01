@@ -17,6 +17,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EstructuraCentralizadaClient interface {
+	// Servicios usados para la implementacion de la estructura centralizada
 	Subir(ctx context.Context, in *Chunk, opts ...grpc.CallOption) (*UploadStatus, error)
 	EnviarPropuesta(ctx context.Context, in *Propuesta, opts ...grpc.CallOption) (*Respuesta, error)
 	VerificarEstadoServidor(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
@@ -27,6 +28,9 @@ type EstructuraCentralizadaClient interface {
 	PedirRecurso(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
 	LiberarRecurso(ctx context.Context, in *Mensaje, opts ...grpc.CallOption) (*Mensaje, error)
 	WriteLogs(ctx context.Context, in *Propuesta, opts ...grpc.CallOption) (*Mensaje, error)
+	SubirDistribuida(ctx context.Context, in *Chunk, opts ...grpc.CallOption) (*UploadStatus, error)
+	DarPermiso(ctx context.Context, in *Solicitud, opts ...grpc.CallOption) (*Mensaje, error)
+	AceptarSolicitud(ctx context.Context, in *Solicitud, opts ...grpc.CallOption) (*Mensaje, error)
 }
 
 type estructuraCentralizadaClient struct {
@@ -127,10 +131,38 @@ func (c *estructuraCentralizadaClient) WriteLogs(ctx context.Context, in *Propue
 	return out, nil
 }
 
+func (c *estructuraCentralizadaClient) SubirDistribuida(ctx context.Context, in *Chunk, opts ...grpc.CallOption) (*UploadStatus, error) {
+	out := new(UploadStatus)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/SubirDistribuida", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *estructuraCentralizadaClient) DarPermiso(ctx context.Context, in *Solicitud, opts ...grpc.CallOption) (*Mensaje, error) {
+	out := new(Mensaje)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/DarPermiso", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *estructuraCentralizadaClient) AceptarSolicitud(ctx context.Context, in *Solicitud, opts ...grpc.CallOption) (*Mensaje, error) {
+	out := new(Mensaje)
+	err := c.cc.Invoke(ctx, "/paquete.estructura_centralizada/AceptarSolicitud", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EstructuraCentralizadaServer is the server API for EstructuraCentralizada service.
 // All implementations must embed UnimplementedEstructuraCentralizadaServer
 // for forward compatibility
 type EstructuraCentralizadaServer interface {
+	// Servicios usados para la implementacion de la estructura centralizada
 	Subir(context.Context, *Chunk) (*UploadStatus, error)
 	EnviarPropuesta(context.Context, *Propuesta) (*Respuesta, error)
 	VerificarEstadoServidor(context.Context, *Mensaje) (*Mensaje, error)
@@ -141,6 +173,9 @@ type EstructuraCentralizadaServer interface {
 	PedirRecurso(context.Context, *Mensaje) (*Mensaje, error)
 	LiberarRecurso(context.Context, *Mensaje) (*Mensaje, error)
 	WriteLogs(context.Context, *Propuesta) (*Mensaje, error)
+	SubirDistribuida(context.Context, *Chunk) (*UploadStatus, error)
+	DarPermiso(context.Context, *Solicitud) (*Mensaje, error)
+	AceptarSolicitud(context.Context, *Solicitud) (*Mensaje, error)
 	mustEmbedUnimplementedEstructuraCentralizadaServer()
 }
 
@@ -177,6 +212,15 @@ func (UnimplementedEstructuraCentralizadaServer) LiberarRecurso(context.Context,
 }
 func (UnimplementedEstructuraCentralizadaServer) WriteLogs(context.Context, *Propuesta) (*Mensaje, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteLogs not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) SubirDistribuida(context.Context, *Chunk) (*UploadStatus, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubirDistribuida not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) DarPermiso(context.Context, *Solicitud) (*Mensaje, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DarPermiso not implemented")
+}
+func (UnimplementedEstructuraCentralizadaServer) AceptarSolicitud(context.Context, *Solicitud) (*Mensaje, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AceptarSolicitud not implemented")
 }
 func (UnimplementedEstructuraCentralizadaServer) mustEmbedUnimplementedEstructuraCentralizadaServer() {
 }
@@ -372,6 +416,60 @@ func _EstructuraCentralizada_WriteLogs_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EstructuraCentralizada_SubirDistribuida_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Chunk)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).SubirDistribuida(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/SubirDistribuida",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).SubirDistribuida(ctx, req.(*Chunk))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EstructuraCentralizada_DarPermiso_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Solicitud)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).DarPermiso(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/DarPermiso",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).DarPermiso(ctx, req.(*Solicitud))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EstructuraCentralizada_AceptarSolicitud_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Solicitud)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EstructuraCentralizadaServer).AceptarSolicitud(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/paquete.estructura_centralizada/AceptarSolicitud",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EstructuraCentralizadaServer).AceptarSolicitud(ctx, req.(*Solicitud))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "paquete.estructura_centralizada",
 	HandlerType: (*EstructuraCentralizadaServer)(nil),
@@ -415,6 +513,18 @@ var _EstructuraCentralizada_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WriteLogs",
 			Handler:    _EstructuraCentralizada_WriteLogs_Handler,
+		},
+		{
+			MethodName: "SubirDistribuida",
+			Handler:    _EstructuraCentralizada_SubirDistribuida_Handler,
+		},
+		{
+			MethodName: "DarPermiso",
+			Handler:    _EstructuraCentralizada_DarPermiso_Handler,
+		},
+		{
+			MethodName: "AceptarSolicitud",
+			Handler:    _EstructuraCentralizada_AceptarSolicitud_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
