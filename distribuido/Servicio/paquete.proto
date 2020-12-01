@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+option go_package = "google.golang.org/Tarea2SD/Client/Servicio";
+
+package paquete;
+
+
+// Servicios usados para la implementacion de la estructura distribuida
+service estructura_distribuida{
+    rpc Subir(Chunk) returns (UploadStatus){}
+    rpc EnviarPropuesta (Propuesta)returns (Respuesta){}
+    rpc VerificarEstadoServidor(Mensaje) returns (Mensaje){}
+    rpc EnviarChunk(ChunkSendToServer)returns(Mensaje){ }
+    rpc BajarArchivo(BookToDownload)returns (ListChunk){}
+    rpc BajarChunk(ChunkDes)returns(ChunkBook){}
+    rpc ObtenerLibrosDisponibles(Mensaje) returns(Books){}
+
+    rpc PedirRecurso(Mensaje)returns(Mensaje){}
+
+    rpc LiberarRecurso(Mensaje)returns(Mensaje){}
+    
+    
+    rpc WriteLogs(Propuesta) returns(Mensaje){}
+
+}
+
+message Books{
+    repeated string Book = 1;
+}
+
+message ChunkDes{
+    string Book = 1;
+    string Part = 2;
+}
+message ChunkBook{
+    bytes Contenido = 1;
+}
+
+
+message ListChunk{
+    repeated string ChunkList = 1;
+    string ext = 2;
+
+}
+
+
+message BookToDownload{
+    string Book = 1;
+}
+
+
+
+message ChunkSendToServer {
+    bytes Contenido = 1;
+    int32 totalChunks = 2;
+    int32 numeroChunk = 3;
+    string nombre = 4;
+}
+
+
+
+message Mensaje {
+    string Msg = 1;
+}
+message Respuesta {
+    string Mensaje= 1;
+    int32 ChunkSendToServer1 = 3;
+    int32 ChunkSendToServer2 = 4;
+    int32 ChunkSendToServer3 = 5;
+}
+
+
+message Propuesta{
+  string  Book = 1;
+  int32 totalChunks = 2;
+  int32 ChunkSendToServer1 = 3;
+  int32 ChunkSendToServer2 = 4;
+  int32 ChunkSendToServer3 = 5;
+  string ext = 6;
+  int32 NodeID = 7;
+  int32 Clock = 8;
+    
+}
+message Chunk {
+    bytes Contenido = 1;
+    int32 totalChunks = 2;
+    int32 numeroChunk = 3;
+    string nombre = 4;
+    string ext = 5;
+}
+
+
+enum UploadStatusCode {
+    Unknown = 0;
+    Ok = 1;
+    Failed = 2;
+}
+
+message UploadStatus {
+    string Mensaje = 1;
+    UploadStatusCode Code = 2;
+}
+
+
+
+
