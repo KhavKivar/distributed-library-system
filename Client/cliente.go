@@ -255,13 +255,44 @@ func main() {
 		text, _ := reader.ReadString('\n')
 
 		if text == "2\n" {
-			rutinaUploadFilesDistribuido("./Book", "Book")
+			for true {
+				reader := bufio.NewReader(os.Stdin)
+				fmt.Print("Bienvenido a la simulacion del algoritmo distribuido \n")
+				fmt.Print("Ingrese 1 o 2 para realizar las siguientes tareas\n")
+				fmt.Print("1) Enviar libros automaticamente\n")
+				fmt.Print("2) Descargar un libro \n")
+				text, _ := reader.ReadString('\n')
+				if text == "1\n" {
+					rutinaUploadFilesDistribuido("./Book", "Book")
+				}
+				if text == "2\n" {
+					log.Println("Elija un libro a descargar en la siguiente lista: ")
+					libros := verLibrosDisponibles()
+
+					for i := 0; i < len(libros); i++ {
+						fmt.Println(strconv.Itoa(i) + "." + libros[i])
+
+					}
+					reader := bufio.NewReader(os.Stdin)
+					text, _ := reader.ReadString('\n')
+					text = text[:len(text)-1]
+
+					indice, _ := strconv.Atoi(text)
+
+					fmt.Println(indice)
+					libroElegido := libros[indice]
+					fmt.Println("Libro elegido ", libroElegido)
+					bajarArchivo(libroElegido)
+				}
+			}
+
 		}
 
 		if text == "1\n" {
 			for true {
 
 				reader := bufio.NewReader(os.Stdin)
+				fmt.Print("Bienvenido a la simulacion del algoritmo centralizado \n")
 				fmt.Print("Ingrese 1 o 2 para realizar las siguientes tareas\n")
 				fmt.Print("1) Enviar libros automaticamente\n")
 				fmt.Print("2) Descargar un libro \n")

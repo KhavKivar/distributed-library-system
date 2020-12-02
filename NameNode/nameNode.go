@@ -238,6 +238,10 @@ func (s *server) WriteLogs(ctx context.Context, in *pb.Propuesta) (*pb.Mensaje, 
 	s2 = int(in.GetChunkSendToServer2())
 	s3 = int(in.GetChunkSendToServer3())
 
+	if _, ok := extBookInfo[name]; !ok {
+		extBookInfo[name] = in.GetExt()
+	}
+
 	writeLogs(name, s1, s2, s3)
 
 	return &pb.Mensaje{Msg: "Accion realizada"}, nil

@@ -235,7 +235,7 @@ func writeLogspp(nombre string, s1 int32, s2 int32, s3 int32, numeroProceso int)
 	c := pb.NewEstructuraCentralizadaClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	re, _ := c.WriteLogs(ctx, &pb.Propuesta{Book: nombre, ChunkSendToServer1: s1, ChunkSendToServer2: s2, ChunkSendToServer3: s3, TotalChunks: int32(numeroProceso)})
+	re, _ := c.WriteLogs(ctx, &pb.Propuesta{Ext: extBookInfo[nombre], Book: nombre, ChunkSendToServer1: s1, ChunkSendToServer2: s2, ChunkSendToServer3: s3, TotalChunks: int32(numeroProceso)})
 
 	if re.GetMsg() == "" {
 		return false
@@ -394,16 +394,6 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 	return &pb.UploadStatus{Mensaje: mensaje, Code: pb.UploadStatusCode_Ok}, nil
 }
 
-func random99() bool {
-	rand.Seed(time.Now().UnixNano())
-	numeroRandom := rand.Intn(100)
-	if numeroRandom < 99 {
-		return true
-	}
-	return false
-
-}
-
 //FUNCIONES DISTRIBUIDAS
 //
 //
@@ -496,11 +486,24 @@ func maxValue(x int, y int) int {
 	return y
 
 }
-func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
-	return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
+func random99() bool {
+	rand.Seed(time.Now().UnixNano())
+	numeroRandom := rand.Intn(100)
+	if numeroRandom < 99 {
+		return true
+	}
+	return false
 
 }
 
+func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
+	r99 := random99()
+	if r99 {
+		return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
+	}
+	return &pb.Respuesta{Mensaje: "Propuesta Rechazada"}, nil
+
+}
 func responderSolicitud(destino int) string {
 	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
 	if err != nil {
@@ -615,16 +618,33 @@ func manejarPropuestaDistribuida(t book) (int, int, int) {
 func procesarCola(wg *sync.WaitGroup) {
 	if len(queueBook) > 0 {
 		//Obtenemos el primer valor
+
 		book1 := queueBook[0]
 		s1, s2, s3 := manejarPropuestaDistribuida(book1)
-		if s1 != -1 {
+
+		//Enviar la Propuesta al nodo madre
+		writeLogsProceso(book1.name, int32(s1), int32(s2), int32(s3), 4)
+		suma := s1 + s2 + s3
+
+		distribuirChunks(int32(s1), int32(s2), int32(s3), book1.name, suma)
+
+		if len(queueBook) == 0 {
+			queueBook = make([]book, 0)
+		} else {
+			queueBook = queueBook[1:]
+		}
+
+		//El algoritsmo distribuidos no funcionan en las maquinas virtuales, pero si localmente .
+		/*if s1 != -1 {
 			prop := propuesta{s1: s1, s2: s2, s3: s3}
 			lamportClock = lamportClock + 1
 			ricartAgrawala(book1, lamportClock, prop)
-			queueBook = queueBook[1:]
+
 		} else {
 			log.Printf("Hubo un error en el envio de la propuesta")
 		}
+
+		*/
 
 	}
 	wg.Done()
