@@ -432,6 +432,14 @@ var maquinaAdyacenteDos int = 3
 var bookActual book
 var propuestaActual propuesta
 
+var mutex = &sync.Mutex{}
+
+func appendQueu(x int) {
+	mutex.Lock()
+	queueSolicitudes = append(queueSolicitudes, x)
+	defer mutex.Unlock()
+}
+
 func enviarPropuestaAlservidorX(s1 int, s2 int, s3 int, nombre string, total int, nservidor int) bool {
 	conn, err := grpc.Dial(ipServer[nservidor], grpc.WithInsecure())
 	if err != nil {
@@ -513,11 +521,13 @@ func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Me
 	//Actualizamos el reloj
 
 	log.Printf("one reply llego del servidor %v", in.GetMaquina())
-	relojComing := int(in.GetRelojLamport())
+	/*relojComing := int(in.GetRelojLamport())
 	lamportClock = maxValue(lamportClock, relojComing) + 1
 
+	*/
+	contadorReplies = contadorReplies - 1
 	if estadoRecurso == "WANTED" {
-		contadorReplies = contadorReplies - 1
+
 		if contadorReplies == 0 {
 			receivedAllreplies = true
 			//Obtengo el recurso..
@@ -536,26 +546,26 @@ func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje,
 
 	relojComing := int(in.GetRelojLamport())
 	procesoNumber := int(in.GetMaquina())
+	lamportClock = maxValue(lamportClock, relojComing)
+
 	log.Printf("T1: %v T2: %v Maquina  %v", lamportClock, relojComing, in.GetMaquina())
 	if estadoRecurso == "HELD" || (estadoRecurso == "WANTED" && (lamportClock < relojComing || lamportClock == relojComing)) {
 		if lamportClock == relojComing && estadoRecurso == "WANTED" {
 			if numeroMaquinaid < procesoNumber {
-				lamportClock = maxValue(lamportClock, relojComing) + 1
 				log.Printf("OK -> Servidor %v ", procesoNumber)
 				go responderSolicitud(procesoNumber)
 				return &pb.Mensaje{Msg: "OK"}, nil
 			}
 		}
 	} else {
-		lamportClock = maxValue(lamportClock, relojComing) + 1
 		log.Printf("OK -> Servidor %v", procesoNumber)
 		go responderSolicitud(procesoNumber)
 		return &pb.Mensaje{Msg: "OK"}, nil
 	}
 	//Lo encolo
 	log.Printf("Lo encolo")
-	queueSolicitudes = append(queueSolicitudes, procesoNumber)
-	lamportClock = maxValue(lamportClock, relojComing) + 1
+	appendQueu(procesoNumber)
+
 	return &pb.Mensaje{Msg: "NO"}, nil
 }
 
@@ -567,24 +577,40 @@ func solicitarAcceso(reloj int) {
 
 func entrarZonaCritica(t book, p propuesta) {
 	estadoRecurso = "HELD"
+	time.Sleep(300 * time.Millisecond)
 	log.Printf("Writting bookInfo.log proposal: %v %v %v  Book:  %v", p.s1, p.s2, p.s3, t.name)
 	writeLogspp(t.name, int32(p.s1), int32(p.s2), int32(p.s3), numeroMaquinaid)
 
 }
 
 func liberarZonaCritica() {
-	time.Sleep(100 * time.Millisecond)
-	estadoRecurso = "RELEASED"
+
+	contadorReplies = 2
+	receivedAllreplies = false
 	replyQueue()
+	estadoRecurso = "RELEASED"
+
 }
 
+func dequeue() {
+
+	mutex.Lock()
+	for len(queueSolicitudes) > 0 {
+
+		queueSolicitudes = queueSolicitudes[1:]
+
+	}
+
+	defer mutex.Unlock()
+}
 func replyQueue() {
 	for i := 0; i < len(queueSolicitudes); i++ {
 		//send reply
 		log.Printf("ALL REPLY OK-> Servidor %v", queueSolicitudes[i])
 		responderSolicitud(queueSolicitudes[i])
 	}
-	queueSolicitudes = make([]int, 0)
+	dequeue()
+
 }
 
 func ricartAgrawala(t book, relojLamport int, p propuesta) {
