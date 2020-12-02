@@ -629,29 +629,30 @@ func procesarCola(wg *sync.WaitGroup) {
 		book1 := queueBook[0]
 		s1, s2, s3 := manejarPropuestaDistribuida(book1)
 
-		//Enviar la Propuesta al nodo madre
-		writeLogsProceso(book1.name, int32(s1), int32(s2), int32(s3), 4)
-		suma := s1 + s2 + s3
+		/*
+			//Enviar la Propuesta al nodo madre
+			writeLogsProceso(book1.name, int32(s1), int32(s2), int32(s3), 4)
+			suma := s1 + s2 + s3
 
-		distribuirChunks(int32(s1), int32(s2), int32(s3), book1.name, suma)
-
-		if len(queueBook) == 0 {
-			queueBook = make([]book, 0)
-		} else {
-			queueBook = queueBook[1:]
-		}
+			distribuirChunks(int32(s1), int32(s2), int32(s3), book1.name, suma)
+		*/
 
 		//El algoritsmo distribuidos no funcionan en las maquinas virtuales, pero si localmente .
-		/*if s1 != -1 {
+		if s1 != -1 {
 			prop := propuesta{s1: s1, s2: s2, s3: s3}
 			lamportClock = lamportClock + 1
 			ricartAgrawala(book1, lamportClock, prop)
+			if len(queueBook) == 0 {
+				queueBook = make([]book, 0)
+			} else {
+				queueBook = queueBook[1:]
+			}
+			suma := s1 + s2 + s3
+			distribuirChunks(int32(s1), int32(s2), int32(s3), book1.name, suma)
 
 		} else {
 			log.Printf("Hubo un error en el envio de la propuesta")
 		}
-
-		*/
 
 	}
 	wg.Done()
