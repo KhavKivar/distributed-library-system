@@ -28,14 +28,6 @@ var totalPartBook = make(map[string]int32)
 var queue []string
 var address string
 
-func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
-
-	if random99() {
-		return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
-	}
-	return &pb.Respuesta{Mensaje: "Propuesta Rechazada"}, nil
-}
-
 func removeContents(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
@@ -404,215 +396,35 @@ func (s *server) Subir(ctx context.Context, in *pb.Chunk) (*pb.UploadStatus, err
 	return &pb.UploadStatus{Mensaje: mensaje, Code: pb.UploadStatusCode_Ok}, nil
 }
 
-/*FUNCIONES DISTRIBUIDAS
+//FUNCIONES DISTRIBUIDAS
 //
 //
 //
 //
 
+type book struct {
+	name  string
+	total int
+	ext   string
+}
+type propuesta struct {
+	s1 int
+	s2 int
+	s3 int
+}
 
+var queueBook []book
+var w sync.WaitGroup
 
+var estadoRecurso string = "RELEASED"
 
-
-
-
-
-
-
-
-
-
-*/
-
-var estadoRecurso string
-var queueSolicitudes []int
-var mutex = &sync.Mutex{}
-var lamportClock int
 var numeroMaquinaid int = 2
-var receivedAllreplies bool
-var contadorReplies int
-var waitingForSend bool
-
-type waitingSafe struct {
-	sync.RWMutex
-	waitingForSend bool
-}
-
-var waitingForSendStruct = &waitingSafe{}
-
-func (waitingForSendStruct *waitingSafe) Get() bool {
-	waitingForSendStruct.RLock()
-	waitingForSendStruct.RUnlock()
-	return waitingForSendStruct.waitingForSend
-}
-func (waitingForSendStruct *waitingSafe) set(x bool) {
-	waitingForSendStruct.Lock()
-	waitingForSendStruct.waitingForSend = x
-	waitingForSendStruct.Unlock()
-}
-
-func random99() bool {
-	rand.Seed(time.Now().UnixNano())
-	numeroRandom := rand.Intn(100)
-	if numeroRandom < 99 {
-		return true
-	}
-	return false
-
-}
-
-func aceptarSolicitudAltiro(destino int) string {
-
-	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := pb.NewEstructuraCentralizadaClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	re, _ := c.AceptarSolicitud(ctx, &pb.Solicitud{RelojLamport: int32(lamportClock), Maquina: int32(numeroMaquinaid)})
-
-	return re.GetMsg()
-}
-
-func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-
-	relojComing := int(in.GetRelojLamport())
-	lamportClock = maxValue(lamportClock, relojComing) + 1
-	log.Printf("one reply llego del servidor %v", in.GetMaquina())
-	if estadoRecurso == "WANTED" {
-		contadorReplies = contadorReplies - 1
-		if contadorReplies == 0 {
-			receivedAllreplies = true
-		}
-	}
-	return &pb.Mensaje{Msg: "KK"}, nil
-}
-
-func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
-	for waitingForSend {
-
-	}
-
-	relojComing := int(in.GetRelojLamport())
-	procesoNumber := int(in.GetMaquina())
-
-	log.Printf("T1: %v T2: %v Maquina  %v", lamportClock, relojComing, in.GetMaquina())
-
-	if estadoRecurso == "HELD" || (estadoRecurso == "WANTED" && (lamportClock < relojComing || lamportClock == relojComing)) {
-		if lamportClock == relojComing && estadoRecurso == "WANTED" {
-			if numeroMaquinaid < procesoNumber {
-				mutex.Lock()
-				lamportClock = maxValue(lamportClock, relojComing) + 1
-				mutex.Unlock()
-				log.Printf("OK -> Servidor %v ", procesoNumber)
-				go aceptarSolicitudAltiro(procesoNumber)
-				return &pb.Mensaje{Msg: "OK"}, nil
-			}
-		}
-	} else {
-		mutex.Lock()
-		lamportClock = maxValue(lamportClock, relojComing) + 1
-		mutex.Unlock()
-		log.Printf("OK -> Servidor %v", procesoNumber)
-		go aceptarSolicitudAltiro(procesoNumber)
-		return &pb.Mensaje{Msg: "OK"}, nil
-	}
-	//Lo encolo
-	log.Printf("Lo encolo")
-	lamportClock = maxValue(lamportClock, relojComing) + 1
-	queueSolicitudes = append(queueSolicitudes, procesoNumber)
-	return &pb.Mensaje{Msg: "NO"}, nil
-}
-
-func enviarMensajeDeAutorizacion(maquina int, destino int) string {
-
-	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := pb.NewEstructuraCentralizadaClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	log.Printf("Enviando mensajes para autorizar Maquina:%v reloj : %v", maquina, lamportClock)
-	re, _ := c.DarPermiso(ctx, &pb.Solicitud{Maquina: int32(maquina), RelojLamport: int32(lamportClock)})
-	return re.GetMsg()
-}
-
-func replyQueue() {
-	for i := 0; i < len(queueSolicitudes); i++ {
-		//send reply
-		log.Printf("ALL REPLY OK-> Servidor %v", queueSolicitudes[i])
-		aceptarSolicitudAltiro(queueSolicitudes[i])
-	}
-	queueSolicitudes = make([]int, 0)
-}
-
-func writeLogsDistribuido(s1 int, s2 int, s3 int, nombre string, total int) {
-	/*
-		mutex.Lock()
-		estado := estadoRecurso
-		mutex.Unlock()
-
-			if estado == "WANTED" || estado == "HELD" {
-				//esperamos a que lo libere
-				for true {
-					if estadoRecurso == "RELEASED" {
-						break
-					}
-				}
-			}
-	*/
-	mutex.Lock()
-	waitingForSend = true
-	estadoRecurso = "WANTED"
-	lamportClock = lamportClock + 1
-	mutex.Unlock()
-
-	contadorReplies = 2
-	log.Printf("Libro :%v", nombre)
-	enviarMensajeDeAutorizacion(2, 1)
-	enviarMensajeDeAutorizacion(2, 3)
-	waitingForSend = false
-
-	for !receivedAllreplies {
-	}
-	mutex.Lock()
-	estadoRecurso = "HELD"
-	mutex.Unlock()
-	//Escribir en elogs
-	//Liberar
-
-	log.Printf("Writting bookInfo.log proposal: %v %v %v  Book:  %v", s1, s2, s3, nombre)
-
-	writeLogspp(nombre, int32(s1), int32(s2), int32(s3), 2)
-
-	mutex.Lock()
-	estadoRecurso = "RELEASED"
-	mutex.Unlock()
-	receivedAllreplies = false
-	replyQueue()
-
-}
-
-func maxValue(x int, y int) int {
-	if x > y {
-		return x
-	}
-	return y
-
-}
-func enviarPropuestaFor(s1 int, s2 int, s3 int, nombre string, total int) bool {
-	c1 := enviarPropuestaAlservidorX(s1, s2, s3, nombre, total, 1)
-	c2 := enviarPropuestaAlservidorX(s1, s2, s3, nombre, total, 3)
-	if c1 && c2 {
-		//Ambos nodos aceptaron la propuesta
-		return true
-	}
-	return false
-}
+var receivedAllreplies bool = false
+var lamportClock int = 0
+var queueSolicitudes []int
+var contadorReplies int = 2
+var maquinaAdyacenteUno int = 1
+var maquinaAdyacenteDos int = 3
 
 func enviarPropuestaAlservidorX(s1 int, s2 int, s3 int, nombre string, total int, nservidor int) bool {
 	conn, err := grpc.Dial(ipServer[nservidor], grpc.WithInsecure())
@@ -631,41 +443,195 @@ func enviarPropuestaAlservidorX(s1 int, s2 int, s3 int, nombre string, total int
 	return false
 }
 
-func enviarPropuestaDistribuida(s1 int, s2 int, s3 int, nombre string, total int) bool {
-	//Lo intentamos tres veces si no gg..
-
-	res := enviarPropuestaFor(s1, s2, s3, nombre, total)
-
-	if res {
-		log.Printf("Propuesta aceptada por todos los nodos en el intento 0 Propuesta:%v %v %v", s1, s2, s3)
-		return true
-	}
-	//intentamos nuevamente
-
-	s1, s2, s3 = generarPropuesta(total, 1)
-
-	res = enviarPropuestaFor(s1, s2, s3, nombre, total)
-	if res {
-		log.Printf("Propuesta aceptada por todos los nodos en el intento 1 Propuesta:%v %v %v", s1, s2, s3)
-		return true
-	}
-	//intentamos nuevamente
-	s1, s2, s3 = generarPropuesta(total, 1)
-	res = enviarPropuestaFor(s1, s2, s3, nombre, total)
-	if res {
-		log.Printf("Propuesta aceptada por todos los nodos en el intento 2 Propuesta:%v %v %v", s1, s2, s3)
+func envioPropuestaAlosServidores(s1 int, s2 int, s3 int, nombre string, total int) bool {
+	c1 := enviarPropuestaAlservidorX(s1, s2, s3, nombre, total, maquinaAdyacenteUno)
+	c2 := enviarPropuestaAlservidorX(s1, s2, s3, nombre, total, maquinaAdyacenteDos)
+	if c1 && c2 {
+		//Ambos nodos aceptaron la propuesta
 		return true
 	}
 	return false
 }
 
-func manejarPropuestaDistribuida(total int, origen int, nombre string) {
-	s1, s2, s3 := generarPropuesta(total, origen)
-	if enviarPropuestaDistribuida(s1, s2, s3, nombre, total) {
-		//Ricart y Agrawala
-		writeLogsDistribuido(s1, s2, s3, nombre, total)
+func enviarPropuestaDistribuida(s1 int, s2 int, s3 int, nombre string, total int, intentos int) (int, int, int) {
+	if intentos == 0 {
+		return -1, -1, -1
+	}
+	if intentos < 3 {
+		s1, s2, s3 = generarPropuesta(total, numeroMaquinaid)
+	}
+	res := envioPropuestaAlosServidores(s1, s2, s3, nombre, total)
+	if res {
+		log.Printf("Propuesta aceptada por todos los nodos en el intento %v Propuesta: %v %v %v", intentos, s1, s2, s3)
+		return s1, s2, s3
+	}
+	return enviarPropuestaDistribuida(s1, s2, s3, nombre, total, intentos-1)
+}
+
+func socilitarPermisosAServidores(destino int, reloj int) string {
+	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	log.Printf("Enviando mensajes para autorizar Maquina:%v reloj : %v", numeroMaquinaid, reloj)
+	re, _ := c.DarPermiso(ctx, &pb.Solicitud{Maquina: int32(numeroMaquinaid), RelojLamport: int32(reloj)})
+	return re.GetMsg()
+}
+func maxValue(x int, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+
+}
+
+func responderSolicitud(destino int) string {
+	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewEstructuraCentralizadaClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	re, _ := c.AceptarSolicitud(ctx, &pb.Solicitud{RelojLamport: int32(lamportClock), Maquina: int32(numeroMaquinaid)})
+	return re.GetMsg()
+}
+
+func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
+	//Actualizamos el reloj
+
+	log.Printf("one reply llego del servidor %v", in.GetMaquina())
+	relojComing := int(in.GetRelojLamport())
+	lamportClock = maxValue(lamportClock, relojComing) + 1
+
+	if estadoRecurso == "WANTED" {
+		contadorReplies = contadorReplies - 1
+		if contadorReplies == 0 {
+			receivedAllreplies = true
+		}
+	}
+
+	return &pb.Mensaje{Msg: "KK"}, nil
+
+}
+
+func (s *server) DarPermiso(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
+
+	relojComing := int(in.GetRelojLamport())
+	procesoNumber := int(in.GetMaquina())
+	log.Printf("T1: %v T2: %v Maquina  %v", lamportClock, relojComing, in.GetMaquina())
+	if estadoRecurso == "HELD" || (estadoRecurso == "WANTED" && (lamportClock < relojComing || lamportClock == relojComing)) {
+		if lamportClock == relojComing && estadoRecurso == "WANTED" {
+			if numeroMaquinaid < procesoNumber {
+				lamportClock = maxValue(lamportClock, relojComing) + 1
+				log.Printf("OK -> Servidor %v ", procesoNumber)
+				go responderSolicitud(procesoNumber)
+				return &pb.Mensaje{Msg: "OK"}, nil
+			}
+		}
 	} else {
-		log.Printf("Los servidores no aceptaron la propuesta tres veces seguidas")
+		lamportClock = maxValue(lamportClock, relojComing) + 1
+		log.Printf("OK -> Servidor %v", procesoNumber)
+		go responderSolicitud(procesoNumber)
+		return &pb.Mensaje{Msg: "OK"}, nil
+	}
+	//Lo encolo
+	log.Printf("Lo encolo")
+	queueSolicitudes = append(queueSolicitudes, procesoNumber)
+	lamportClock = maxValue(lamportClock, relojComing) + 1
+	return &pb.Mensaje{Msg: "NO"}, nil
+}
+
+func solicitarAcceso(reloj int) {
+	r1 := socilitarPermisosAServidores(maquinaAdyacenteUno, reloj)
+	r2 := socilitarPermisosAServidores(maquinaAdyacenteDos, reloj)
+	log.Printf("Acceso respuesta M1: %v M2: %v", r1, r2)
+}
+
+func entrarZonaCritica(t book, p propuesta) {
+
+	estadoRecurso = "HELD"
+	log.Printf("Writting bookInfo.log proposal: %v %v %v  Book:  %v", p.s1, p.s2, p.s3, t.name)
+	writeLogspp(t.name, int32(p.s1), int32(p.s2), int32(p.s3), numeroMaquinaid)
+
+}
+
+func liberarZonaCritica() {
+	time.Sleep(100 * time.Millisecond)
+	estadoRecurso = "RELEASED"
+	replyQueue()
+}
+
+func replyQueue() {
+	for i := 0; i < len(queueSolicitudes); i++ {
+		//send reply
+		log.Printf("ALL REPLY OK-> Servidor %v", queueSolicitudes[i])
+		responderSolicitud(queueSolicitudes[i])
+	}
+	queueSolicitudes = make([]int, 0)
+}
+
+func ricartAgrawala(t book, relojLamport int, p propuesta) {
+	estadoRecurso = "WANTED"
+	contadorReplies = 2
+	receivedAllreplies = false
+
+	solicitarAcceso(relojLamport)
+	for !receivedAllreplies {
+	}
+	log.Printf("Entrando a la zona critica")
+	entrarZonaCritica(t, p)
+
+	liberarZonaCritica()
+}
+
+func manejarPropuestaDistribuida(t book) (int, int, int) {
+	s1, s2, s3 := generarPropuesta(t.total, numeroMaquinaid)
+	//Enviamos la propuesta
+	s1, s2, s3 = enviarPropuestaDistribuida(s1, s2, s3, t.name, t.total, 3)
+	if s1 != -1 {
+		return s1, s2, s3
+	}
+	return -1, -1, -1
+
+}
+
+func procesarCola(wg *sync.WaitGroup) {
+	if len(queueBook) > 0 {
+		//Obtenemos el primer valor
+		book1 := queueBook[0]
+		s1, s2, s3 := manejarPropuestaDistribuida(book1)
+		if s1 != -1 {
+			prop := propuesta{s1: s1, s2: s2, s3: s3}
+			lamportClock = lamportClock + 1
+			ricartAgrawala(book1, lamportClock, prop)
+			queueBook = queueBook[1:]
+		} else {
+			log.Printf("Hubo un error en el envio de la propuesta")
+		}
+
+	}
+	wg.Done()
+}
+
+func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
+	return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
+
+}
+func dispatcher(wg *sync.WaitGroup) {
+	r1 := time.NewTicker(100 * time.Millisecond)
+	for {
+		select {
+		case <-r1.C:
+			wg.Add(1)
+			procesarCola(wg)
+			wg.Wait()
+		}
 	}
 }
 
@@ -693,15 +659,13 @@ func (s *server) SubirDistribuida(ctx context.Context, in *pb.Chunk) (*pb.Upload
 	escribirChunk(path, chunk)
 
 	if part == (total - 1) {
-
 		extBookInfo[nombre] = ext
 		totalPartBook[nombre] = total
 
-		queue = append(queue, nombre)
-
 		if verificarSubida(nombre) {
 			exito = true
-			go manejarPropuestaDistribuida(int(total), 2, nombre)
+			b := book{name: nombre, total: int(total), ext: ext}
+			queueBook = append(queueBook, b)
 		}
 	}
 
@@ -713,17 +677,13 @@ func (s *server) SubirDistribuida(ctx context.Context, in *pb.Chunk) (*pb.Upload
 }
 
 func main() {
-	lamportClock = 0
-	estadoRecurso = "RELEASED"
-	contadorReplies = 2
-	receivedAllreplies = false
-	waitingForSend = false
-	waitingForSendStruct.set(false)
+
 	argsWithoutProg := os.Args[1:]
 	address = argsWithoutProg[3]
 	ipServer[1] = argsWithoutProg[0]
 	ipServer[2] = argsWithoutProg[1]
 	ipServer[3] = argsWithoutProg[2]
+	go dispatcher(&w)
 
 	removeContents("../DataNode2")
 	lis, err := net.Listen("tcp", port)
@@ -732,7 +692,6 @@ func main() {
 	}
 	s := grpc.NewServer()
 	pb.RegisterEstructuraCentralizadaServer(s, &server{})
-
 	log.Printf("Server Iniciado")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

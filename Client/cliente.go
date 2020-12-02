@@ -145,7 +145,7 @@ func rutinaUploadFilesDistribuido(folder string, dontInclude string) {
 			bookName := strings.Split(bookWithExt, ".")[0]
 
 			path := folder + "/" + bookWithExt
-			uploadFileRandomDistribuido(path, bookName, ext)
+			go uploadFileRandomDistribuido(path, bookName, ext)
 		}
 	}
 }
@@ -259,35 +259,38 @@ func main() {
 		}
 
 		if text == "1\n" {
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Ingrese 1 o 2 para realizar las siguientes tareas\n")
-			fmt.Print("1) Enviar libros automaticamente\n")
-			fmt.Print("2) Descargar un libro \n")
-			text, _ := reader.ReadString('\n')
+			for true {
 
-			if text == "1\n" {
-				rutinaUploadFiles("./Book", "Book")
-			}
+				reader := bufio.NewReader(os.Stdin)
+				fmt.Print("Ingrese 1 o 2 para realizar las siguientes tareas\n")
+				fmt.Print("1) Enviar libros automaticamente\n")
+				fmt.Print("2) Descargar un libro \n")
+				text, _ := reader.ReadString('\n')
 
-			if text == "2\n" {
-				log.Println("Elija un libro a descargar en la siguiente lista: ")
-				libros := verLibrosDisponibles()
+				if text == "1\n" {
+					rutinaUploadFiles("./Book", "Book")
+				}
 
-				for i := 0; i < len(libros); i++ {
-					fmt.Println(strconv.Itoa(i) + "." + libros[i])
+				if text == "2\n" {
+					log.Println("Elija un libro a descargar en la siguiente lista: ")
+					libros := verLibrosDisponibles()
+
+					for i := 0; i < len(libros); i++ {
+						fmt.Println(strconv.Itoa(i) + "." + libros[i])
+
+					}
+					reader := bufio.NewReader(os.Stdin)
+					text, _ := reader.ReadString('\n')
+					text = text[:len(text)-1]
+
+					indice, _ := strconv.Atoi(text)
+
+					fmt.Println(indice)
+					libroElegido := libros[indice]
+					fmt.Println("Libro elegido ", libroElegido)
+					bajarArchivo(libroElegido)
 
 				}
-				reader := bufio.NewReader(os.Stdin)
-				text, _ := reader.ReadString('\n')
-				text = text[:len(text)-1]
-
-				indice, _ := strconv.Atoi(text)
-
-				fmt.Println(indice)
-				libroElegido := libros[indice]
-				fmt.Println("Libro elegido ", libroElegido)
-				bajarArchivo(libroElegido)
-
 			}
 		}
 
