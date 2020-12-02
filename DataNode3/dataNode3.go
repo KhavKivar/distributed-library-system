@@ -424,6 +424,9 @@ var contadorReplies int = 2
 var maquinaAdyacenteUno int = 1
 var maquinaAdyacenteDos int = 2
 
+var bookActual book
+var propuestaActual propuesta
+
 func enviarPropuestaAlservidorX(s1 int, s2 int, s3 int, nombre string, total int, nservidor int) bool {
 	conn, err := grpc.Dial(ipServer[nservidor], grpc.WithInsecure())
 	if err != nil {
@@ -486,24 +489,7 @@ func maxValue(x int, y int) int {
 	return y
 
 }
-func random99() bool {
-	rand.Seed(time.Now().UnixNano())
-	numeroRandom := rand.Intn(100)
-	if numeroRandom < 99 {
-		return true
-	}
-	return false
 
-}
-
-func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
-	r99 := random99()
-	if r99 {
-		return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
-	}
-	return &pb.Respuesta{Mensaje: "Propuesta Rechazada"}, nil
-
-}
 func responderSolicitud(destino int) string {
 	conn, err := grpc.Dial(ipServer[destino], grpc.WithInsecure())
 	if err != nil {
@@ -515,6 +501,7 @@ func responderSolicitud(destino int) string {
 	defer cancel()
 	re, _ := c.AceptarSolicitud(ctx, &pb.Solicitud{RelojLamport: int32(lamportClock), Maquina: int32(numeroMaquinaid)})
 	return re.GetMsg()
+
 }
 
 func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Mensaje, error) {
@@ -528,6 +515,11 @@ func (s *server) AceptarSolicitud(ctx context.Context, in *pb.Solicitud) (*pb.Me
 		contadorReplies = contadorReplies - 1
 		if contadorReplies == 0 {
 			receivedAllreplies = true
+			//Obtengo el recurso..
+			log.Printf("Entrando a la zona critica")
+			entrarZonaCritica(bookActual, propuestaActual)
+			liberarZonaCritica()
+
 		}
 	}
 
@@ -594,14 +586,10 @@ func ricartAgrawala(t book, relojLamport int, p propuesta) {
 	estadoRecurso = "WANTED"
 	contadorReplies = 2
 	receivedAllreplies = false
-
+	bookActual = t
+	propuestaActual = p
 	solicitarAcceso(relojLamport)
-	for !receivedAllreplies {
-	}
-	log.Printf("Entrando a la zona critica")
-	entrarZonaCritica(t, p)
 
-	liberarZonaCritica()
 }
 
 func manejarPropuestaDistribuida(t book) (int, int, int) {
@@ -615,8 +603,27 @@ func manejarPropuestaDistribuida(t book) (int, int, int) {
 
 }
 
+func random99() bool {
+	rand.Seed(time.Now().UnixNano())
+	numeroRandom := rand.Intn(100)
+	if numeroRandom < 99 {
+		return true
+	}
+	return false
+
+}
+
+func (s *server) EnviarPropuesta(ctx context.Context, in *pb.Propuesta) (*pb.Respuesta, error) {
+	r99 := random99()
+	if r99 {
+		return &pb.Respuesta{Mensaje: "Propuesta Aceptada"}, nil
+	}
+	return &pb.Respuesta{Mensaje: "Propuesta Rechazada"}, nil
+
+}
+
 func procesarCola(wg *sync.WaitGroup) {
-	if len(queueBook) > 0 {
+	if len(queueBook) > 0 && estadoRecurso == "RELEASED" {
 		//Obtenemos el primer valor
 
 		book1 := queueBook[0]
