@@ -1,3 +1,27 @@
+
+## Tarea 2 Sistema distribuidos
+
+Implementación de algoritmos de exclusión mutua para una red de biblioteca.
+Los algoritmos implementados fueron los siguientes:
+
+* Centralizado
+* Algoritmo de Ricart y Agrawala
+
+
+
+
+
+
+
+
+
+
+
+##Ejecucion:
+
+
+
+
 Para ejecutar de forma local ejecutar el siguiente comando en cada nodo:
 
 make -f makefile.win run
