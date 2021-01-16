@@ -17,7 +17,7 @@ Los algoritmos implementados fueron los siguientes:
 
 
 
-##Ejecucion:
+## Ejecucion:
 
 
 
