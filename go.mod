@@ -1,6 +1,6 @@
-module google.golang.org/Tarea2SD
+module github.com/KhavKivar/distributed-library-system
 
-go 1.15
+go 1.20
 
 require (
 	github.com/golang/protobuf v1.4.3

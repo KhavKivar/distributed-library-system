@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	pb "google.golang.org/Tarea2SD/Client/Servicio"
+	pb "github.com/KhavKivar/distributed-library-system/Client/Servicio"
 
 	"google.golang.org/grpc"
 )

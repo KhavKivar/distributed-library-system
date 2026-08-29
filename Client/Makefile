@@ -1,8 +1,5 @@
-hello:
-	echo "Hello Client"
-
 build:
-	go build -o bin/main 10.10.28.52:50051 10.10.28.53:50052 10.10.28.54:50053 10.10.28.55:50055
+	go build -o bin/client .
 
 run:
-	go run cliente.go 10.10.28.52:50051 10.10.28.53:50052 10.10.28.54:50053 10.10.28.55:50055
+	go run . localhost:50051 localhost:50052 localhost:50053 localhost:50055

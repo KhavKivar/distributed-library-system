@@ -1,5 +1,7 @@
-/Client/Makefile
-/DataNode1/Makefile
-/DataNode2/Makefile
-/DataNode3/Makefile
-/NameNode/Makefile
+bin/
+*.log
+Client/Book/*
+!Client/Book/.gitkeep
+DataNode1/*/
+DataNode2/*/
+DataNode3/*/
